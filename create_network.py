@@ -18,10 +18,7 @@ def create_network(path):
             communities = pickle.load(f)
     else:
         print('communities file not found, using girvan_newman to generate communities...')
-        communities_generator = community.girvan_newman(G)
-        communities = []
-        for i in range(5):
-            communities.append(list(next(communities_generator)))
+        communities = community.louvain_communities(G)
         with open("communities.pkl", "wb") as f:
             pickle.dump(np.array(communities), f)
     
