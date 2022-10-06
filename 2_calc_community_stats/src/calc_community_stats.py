@@ -8,7 +8,11 @@ Created on Thu Oct  6 01:46:45 2022
 
 import pandas as pd
 import networkx as nx
+import os
 import community as community_louvain
+
+#making sure wd is file directory so hardcoded paths work
+os.chdir(os.path.dirname(os.path.abspath(__file__))) 
 
 ## Function takes a graph partitioned by communities and returns number of edges between communities
 
