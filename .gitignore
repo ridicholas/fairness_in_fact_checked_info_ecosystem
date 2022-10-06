@@ -7,8 +7,11 @@ __pycache__/
 *.so
 
 #data
+data/
+/data/
 *.edgelist
-*.csv
+
+.DS_Store
 
 # Distribution / packaging
 .Python
