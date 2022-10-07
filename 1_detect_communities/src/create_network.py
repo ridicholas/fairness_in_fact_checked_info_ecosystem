@@ -33,5 +33,6 @@ def create_network(path):
         community_label += 1
 
     nx.write_gpickle(G, "../../data/nodes_with_community.gpickle")
+    nx.write_gexf(G, "../../data/nodes_with_community.gexf")
     return None
 
