@@ -45,6 +45,7 @@ def calc_stats_for_communities(G, community_network, outpath):
         .rename(columns={0:'com'})
     
     community_size = communities.groupby(['com']).size().sort_values(ascending=False)
+    
     print('\n\nCommunity Size Calculated...\n\n')
     t = list(G.degree)
     degrees = [item[1] for item in t]

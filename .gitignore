@@ -10,6 +10,8 @@ __pycache__/
 data/
 /data/
 *.edgelist
+*.gpickle
+*.gexf
 
 .DS_Store
 
