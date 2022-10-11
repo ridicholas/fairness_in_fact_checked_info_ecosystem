@@ -63,10 +63,38 @@ def export_community_net(G, outpath):
 
     communities = nx.get_node_attributes(G, 'Community')
     ig = community_louvain.induced_graph(communities, G, weight = 'WEIGHT')
+    btwn_c = nx.betweenness_centrality(ig, weight='WEIGHT')
+    
     communities = pd.DataFrame.from_dict(nx.get_node_attributes(G, 'Community'), orient='index')\
         .rename(columns={0:'com'})
-    community_size = communities.groupby(['com']).size().sort_values(ascending=False).to_dict()
+    community_size = communities.groupby(['com']).size().sort_values(ascending=False)
+    
+    above_10k = community_size[community_size>10000]
+    community_size = community_size.to_dict()
     nx.set_node_attributes(ig, community_size, 'SIZE')
+    
+    c1 = []
+    c2 = []
+    weight = []
+    for u,v,a in ig.edges(data=True):
+        if u in above_10k.index and v in above_10k.index: 
+           c1.append(u)
+           c2.append(v)
+           weight.append(a['WEIGHT'])
+    edges_between_communities = pd.DataFrame()
+    edges_between_communities['community1'] = c1
+    edges_between_communities['community2'] = c2
+    edges_between_communities['edges'] = weight
+    
+    edges_between_communities['percent_edges'] = edges_between_communities.groupby(['community1'])['edges']\
+        .transform(lambda x: x/x.sum())
+
+    for i in range(len(edges_between_communities)):
+        nx.set_edge_attributes(ig, 
+                               {(edges_between_communities.iloc[i,0], 
+                                 edges_between_communities.iloc[i,1]): 
+                                {'prob_links_to':edges_between_communities.iloc[i,3]}})
+    
     #remove self edges
     #ig.remove_edges_from(nx.selfloop_edges(ig))
 
@@ -85,5 +113,5 @@ net_outpath = '../output/subset_net.gexf'
 com_outpath = '../output/community_net.gexf'
 
 G = nx.read_gpickle(path)
-subset_graph(G, net_outpath, communities=[3, 56, 43])
+#subset_graph(G, net_outpath, communities=[3, 56, 43])
 export_community_net(G, com_outpath)
