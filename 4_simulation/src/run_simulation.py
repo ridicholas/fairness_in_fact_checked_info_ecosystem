@@ -15,6 +15,33 @@ from sklearn.metrics import pairwise_distances
 import progressbar
 import argparse
 import operator
+import os
+import time
+
+#making sure wd is file directory so hardcoded paths work
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+#having trouble importing this from the other folder so just copied and pasted it here for now
+def subset_graph(G, outpath, communities=None):
+    """
+    If communities is not None, only return graph of nodes in communities subset.
+
+    param G: input graph
+    param communities: list of int
+    """
+
+    #filter graph to desired community subset
+    comm_list = nx.get_node_attributes(G, 'Community')
+    nodes = list(G.nodes)
+    G2 = G.copy()
+    if communities is not None:
+        for node in nodes:
+            if comm_list[node] not in communities:
+                G2.remove_node(node)
+    
+    nx.write_gexf(G2, outpath)
+
+    return G2
 
 def scale(x):
     '''
@@ -24,11 +51,120 @@ def scale(x):
     return(x/np.max(x))
 
 
+
+def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics: int, perc_bots: float, impactednesses: list, sentiments: list):
+    '''
+    Will create a network for simulation using input graph and provided community level attitudes towards topics
+
+    :param G: input digraph
+    :param perc_nodes_to_use: percentage of nodes from G you want to keep for simulation
+    :param numTopics: number of topics in use this simulation round
+    :perc_bots: what percentage of nodes will be bots
+    :param impactednesses:  len(numTopics) list of dictionaries. impactednesses[i] contains dictionary where keys are communities and values are the community's 
+                            impactedness value towards topic i.
+                            (this value will be used as mean for drawing distribution)
+    :param sentiments: len(numTopics) list of dictionaries. sentiments[i] contains dictionary where keys are communities and values are the community's 
+                            sentiment value towards topic i.
+                            (this value will be used as mean for drawing distribution)
+    :return: returns new network where nodes have impactedness, sentiments, and are bots
+    
+    '''
+
+    to_remove = random.sample(list(G.nodes), int(len(G.nodes)*(1-perc_nodes_to_use)))
+    to_keep = list(set(list(G.nodes)) - set(to_remove))
+    G.remove_nodes_from(to_remove)
+
+    # Randomly select who will be a bot
+    num_bots = int(np.round(len(to_keep)*perc_bots))
+    bot_names = random.sample(to_keep, num_bots) #might want to make it so we sample a certain number from each community instead
+
+    for node, data in G.nodes(data=True):
+
+        #set things that matter if you are bot or not
+        if node in bot_names:
+            data['lambda'] = np.random.uniform(0.1,0.75)
+            data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
+            data['inbox'] = []
+            data['kind'] = 'bot'
+            data['mentioned_by'] = []
+        else:
+            data['lambda'] = np.random.uniform(0.001,0.75)
+            data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
+            data['inbox'] = []
+            data['mentioned_by'] = []
+
+        #set everything else
+        data['impactedness'] = {}
+        data['sentiment'] = {}
+
+        for topic in range(numTopics):
+            data['impactedness'][topic] = np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1) #making it a gaussian for now
+            data['sentiment'][topic] = np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1) #making it a gaussian for now
+        
+        data['belief'] = np.array(list(data['sentiment'].values())).mean() #make belief an average of sentiments? then what we are interested in are changes in belief due to misinfo?
+
+
+        
+        if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
+            data['kind'] = 'beacon'
+        else:
+            data['kind'] = 'normal'
+
+    ## Remove self_loops and isololates
+    G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
+    G.remove_nodes_from(list(nx.isolates(G)))
+    
+    return(G)
+
+   
+#quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
 '''
-Add agent characteristics.
-We can modify this code to create the attributes for each agent
-in the simulation given a graph G
+print('running....')
+path = '../../data/nodes_with_community.gpickle'
+
+impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},{3: 0.1, 56: 0.8, 43: 0.1},{3: 0.8, 56: 0.1, 43: 0.8}]
+sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, {3: 0.7, 56: 0.3, 43: 0.7},{3: 0.7, 56: 0.3, 43: 0.7}]
+
+t = time.time()
+G = create_simulation_network(G=subset_graph(nx.read_gpickle(path), 
+                                communities=[3,56,43], outpath='sim_subset.gexf'), 
+                                perc_nodes_to_use = 0.1,
+                                numTopics = 3, 
+                                perc_bots = 0.01, 
+                                impactednesses = impactednesses, 
+                                sentiments = sentiments)
+
+print('making network took: {} seconds'.format(time.time() - t))
+
+for node, data in G.nodes(data=True):
+    print('node: {}, Community: {}, lambda {}, wake: {}, kind: {}, impactedness: {}, sentiment: {}'.format(node, 
+                                                                                                              data['Community'],
+                                                                                                              data['lambda'],
+                                                                                                              data['wake'],
+                                                                                                              data['kind'],
+                                                                                                              data['impactedness'],
+                                                                                                              data['sentiment']))
+
 '''
+    
+
+
+
+    
+    
+
+        
+
+
+
+
+        
+        
+        
+            
+
+
+
 
 def create_polarized_network(size = 100, bot_initial_links = 2, perc_bots = 0.05):
     '''
@@ -49,6 +185,8 @@ def create_polarized_network(size = 100, bot_initial_links = 2, perc_bots = 0.05
         data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
         data['inbox'] = []
         data['mentioned_by'] = []
+
+        
         
         
         '''
