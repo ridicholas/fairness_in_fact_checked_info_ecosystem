@@ -256,11 +256,11 @@ for node, data in sampleG.nodes(data=True):
 
 
 
-dict(collections.Counter(all_info['topic']))
-dict(collections.Counter(all_info['value']))
+print(dict(collections.Counter(all_info['topic'])))
+print(dict(collections.Counter(all_info['value'])))
 
-pd.crosstab(all_info['topic'], all_info['node-community'])
-pd.crosstab(all_info['topic'], [all_info['value'], all_info['node-community']], rownames = ['topic'], colnames = ['value', 'community'])
+print(pd.crosstab(all_info['topic'], all_info['node-community'], rownames = ['topic'], colnames = ['community']))
+print(pd.crosstab(all_info['topic'], [all_info['value'], all_info['node-community']], rownames = ['topic'], colnames = ['value', 'community']))
 
 
 
