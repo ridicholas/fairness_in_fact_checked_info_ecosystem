@@ -121,7 +121,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
 #quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
 
 print('running....')
-path = '/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/data/nodes_with_community.gpickle'
+path = '../../data/nodes_with_community.gpickle'
 num_topics = 4
 
 impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},
@@ -133,12 +133,6 @@ sentiments = [{3: 0.5, 56: 0.5, 43: 0.5},
               {3: 0.4, 56: 0.7, 43: 0.7}, 
               {3: 0.7, 56: 0.4, 43: 0.7},
               {3: 0.7, 56: 0.7, 43: 0.4}]
-
-
-impactednesses_by_com = {3: [0.5,0.8,0.1,0.1],
-                         56:[0.5,0.1,0.8,0.1],
-                         43:[0.5,0.1,0.1,0.8]}
-
 
 
 t = time.time()
