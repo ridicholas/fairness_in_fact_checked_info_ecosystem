@@ -124,11 +124,25 @@ print('running....')
 path = '../../data/nodes_with_community.gpickle'
 num_topics = 4
 
+
+
+'''
+First topic (row) impacts every group the same, the other topics each impact 
+one group significantly more than the others
+'''
+
+
 impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},
                   {3: 0.8, 56: 0.1, 43: 0.1},
                   {3: 0.1, 56: 0.8, 43: 0.1},
                   {3: 0.1, 56: 0.1, 43: 0.8}]
 
+'''
+For the first topic (which everyone cares about equally), belief is roughly average (50%). 
+For the other topics, if a community is more impacted by a topic, we assume that their 
+average belief is lower, indicating that they have more knowledge of the truth than the 
+other communities that are not impacted  by the topic.
+'''
 sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, 
               {3: 0.4, 56: 0.7, 43: 0.7}, 
               {3: 0.7, 56: 0.4, 43: 0.7},
