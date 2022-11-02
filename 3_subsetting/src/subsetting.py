@@ -26,7 +26,10 @@ def subset_graph(G, outpath, communities=None):
                 G2.remove_node(node)
     
     nx.write_gexf(G2, outpath)
+    
 
+
+    '''
     #get log degree distribution
     degrees = list(list(zip(*G2.degree))[1])
 
@@ -53,10 +56,11 @@ def subset_graph(G, outpath, communities=None):
     plt.ylabel('log(frequency')
     plt.title('Twitter Degree Log-Log Rank-Frequency Plot')
     plt.show()
+    '''
 
 
 
-    return None
+    return G
 
 
 def export_community_net(G, outpath):
