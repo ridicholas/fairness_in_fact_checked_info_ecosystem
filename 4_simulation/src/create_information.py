@@ -268,11 +268,14 @@ for node, data in sampleG.nodes(data=True):
     all_info['time-origin'].append(t)
 
 
-
+print('\n\n\nTopic Distribution\n\n\n')
 print(dict(collections.Counter(all_info['topic'])))
+print('\n\n\nInformation Value Distribution\n\n\n')
 print(dict(collections.Counter(all_info['value'])))
 
+print('\n\n\nTopic + Community Distribution\n\n\n')
 print(pd.crosstab(all_info['topic'], all_info['node-community'], rownames = ['topic'], colnames = ['community']))
+print('\n\n\nTopic + Community + Information Value Distribution\n\n\n')
 print(pd.crosstab(all_info['topic'], [all_info['value'], all_info['node-community']], rownames = ['topic'], colnames = ['value', 'community']))
 
 
