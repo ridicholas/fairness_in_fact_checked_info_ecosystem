@@ -167,11 +167,10 @@ def calculate_sentiment_rankings(G: nx.DiGraph, topics: list):
 
     for topic in topics:
         node_sentiments = [all_node_sentiments[key][topic] for key in all_node_sentiments.keys()]
-        sent_mean = np.mean(node_sentiments)
-        deviations = [np.absolute(i - sent_mean) for i in node_sentiments]
+        deviations = [np.absolute(i - 0.5) for i in node_sentiments]
         rankings['sentiment' + str(topic)] = node_sentiments
         rankings['deviation' + str(topic)] = deviations
-        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < sent_mean,
+        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < 0.5,
                                                  -1*rankings['deviation' + str(topic)].rank(method='max')/len(rankings),
                                                  rankings['deviation' + str(topic)].rank(method='max')/len(rankings))
         
