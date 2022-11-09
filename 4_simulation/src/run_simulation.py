@@ -17,31 +17,15 @@ import argparse
 import operator
 import os
 import time
-
-#making sure wd is file directory so hardcoded paths work
+from scipy.stats import beta, rankdata
+import pickle
+# making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-#having trouble importing this from the other folder so just copied and pasted it here for now
-def subset_graph(G, outpath, communities=None):
-    """
-    If communities is not None, only return graph of nodes in communities subset.
+# having trouble importing this from the other folder so just copied and pasted it here for now
 
-    param G: input graph
-    param communities: list of int
-    """
 
-    #filter graph to desired community subset
-    comm_list = nx.get_node_attributes(G, 'Community')
-    nodes = list(G.nodes)
-    G2 = G.copy()
-    if communities is not None:
-        for node in nodes:
-            if comm_list[node] not in communities:
-                G2.remove_node(node)
-    
-    nx.write_gexf(G2, outpath)
 
-    return G2
 
 def scale(x):
     '''
@@ -51,9 +35,15 @@ def scale(x):
     return(x/np.max(x))
 
 
+def percentile(x):
+    x = np.array(x)
+    ranks = rankdata(x)
+    return(ranks/len(x))
+
 
 def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics: int, perc_bots: float, impactednesses: list, sentiments: list):
     '''
+
     Will create a network for simulation using input graph and provided community level attitudes towards topics
 
     :param G: input digraph
@@ -67,6 +57,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
                             sentiment value towards topic i.
                             (this value will be used as mean for drawing distribution)
     :return: returns new network where nodes have impactedness, sentiments, and are bots
+
     
     '''
 
@@ -92,23 +83,25 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
             data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
             data['inbox'] = []
             data['mentioned_by'] = []
+            data['kind'] = 'normal'
 
         #set everything else
         data['impactedness'] = {}
         data['sentiment'] = {}
 
         for topic in range(numTopics):
-            data['impactedness'][topic] = np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1) #making it a gaussian for now
-            data['sentiment'][topic] = np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1) #making it a gaussian for now
+            data['impactedness'][topic] = np.max([0, np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
+            data['sentiment'][topic] = np.max([0, np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
         
         data['belief'] = np.array(list(data['sentiment'].values())).mean() #make belief an average of sentiments? then what we are interested in are changes in belief due to misinfo?
 
 
         
-        if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
-            data['kind'] = 'beacon'
-        else:
-            data['kind'] = 'normal'
+        if data['kind'] != 'bot':
+            if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
+                data['kind'] = 'beacon'
+
+
 
     ## Remove self_loops and isololates
     G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
@@ -116,328 +109,302 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
     
     return(G)
 
+
+
+def calculate_sentiment_rankings(G: nx.DiGraph, topics: list):
+
+    '''
+    This function returns a pandas DataFrame with all nodes' percentile rankings of deviation from mean sentiment across all topics.
+    This ranking is multiplied by -1 if they have a negative deviation and by +1 if they have a positive deviation,
+    creating a range of possible values [-1,1].
+    
+    This pandas dataframe is used as an input to modify the distribution from which agents draw their quality of information when tweeting. 
+    A higher rank value in the dataframe results in a higher probability of creating misinformation. 
+    This should be intuitive... if someone's sentiment is already high, they are
+    more likely to create misinformation. If someone's sentiment is low, they are more likely to produce anti-misinformation.
+    
+    One potential issue here is if sentiment is tightly clustered for all agents, this will sort of artificially make some agents produce more/less misinformation in that case.
+    '''
+    all_node_sentiments = nx.get_node_attributes(G, 'sentiment')
+    rankings = pd.DataFrame(index = all_node_sentiments.keys())
+
+    for topic in topics:
+        node_sentiments = [all_node_sentiments[key][topic] for key in all_node_sentiments.keys()]
+        deviations = [np.absolute(i - 0.5) for i in node_sentiments]
+        rankings['sentiment' + str(topic)] = node_sentiments
+        rankings['deviation' + str(topic)] = deviations
+        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < 0.5,
+                                                 -1*rankings['deviation' + str(topic)].rank(method='max')/len(rankings),
+                                                 rankings['deviation' + str(topic)].rank(method='max')/len(rankings))
+        
+    return rankings
+
+
+
+def choose_topic(data: dict):
+    topic_probs = [i / sum(data['impactedness'].values()) for i in data['impactedness'].values()]
+    topic = choice(np.arange(0, len(topic_probs)), p=topic_probs)
+    return topic
+
+def choose_info_quality(node: str, rankings: pd.DataFrame, topic: int, agent_type: str):
+    
+    '''
+    For each (non-bot) type, we draw from a beta distribution with beta(5 - a, 5 + a), and we shift the parameters according
+    to their percentile rankings of sentiment deviation from the mean, such that those with low sentiment 
+    produce more anti-misinformation, and those with high sentiment produce more misinformation, but noise is always the most common
+    info type produced.
+    
+    Because B(a,b) is bounded by (0, 1), we can just use thirds as cut points to effectively give different 
+    probabilistic weight to information quality in {-1, 0, 1}.
+    
+    Bots produce misinformation 80% of the time
+    '''
+    if agent_type != 'bot':
+        deviation_rank = rankings.loc[node].loc['rank' + str(topic)]
+        raw = beta.rvs(5 + deviation_rank, 5 - deviation_rank, size=1)
+        value = np.where(raw < 0.3333, -1, np.where(raw >= 0.3333 and raw < 0.666, 0, 1))[0]
+    else: 
+        value = np.where(np.random.uniform(size=1) > 0.2, 1, 0)[0]
+    return value
+
+
+def choose_claim(value: int):
+    '''
+    Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair 
+    is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
+    so that we don't have agents posting {-1,0,1} all relative to the same claim.'
+    
+    Parameters
+    ----------
+    value : quality of informaiton {-1, 0, 1} if anti-misinformation, noise, misinformation
+    Returns
+    -------
+    claim number : (0-33) if anti-misinfo, (34-66) if noise, (66-100) if misinfo.
+
+    '''
+    
+    if value == -1:
+        claim = random.sample(list(range(0,33)), k=1)[0]
+    elif value == 0:
+        claim = random.sample(list(range(33,66)), k=1)[0]
+    elif value == 1:
+        claim = random.sample(list(range(66,100)), k=1)[0]
+    return claim
+
+def subset_graph(G, communities=None):
+    """
+    If communities is not None, only return graph of nodes in communities subset.
+
+    param G: input graph
+    param communities: list of int
+    """
+
+    # filter graph to desired community subset
+    comm_list = nx.get_node_attributes(G, 'Community')
+    nodes = list(G.nodes)
+    G2 = G.copy()
+    if communities is not None:
+        for node in nodes:
+            if comm_list[node] not in communities:
+                G2.remove_node(node)
+
+    #nx.write_gexf(G2, outpath)
+
+    return G2
+
+def retweet_behavior(topic, value, topic_sentiment, creator_prestige):
+    if value == -1:
+        retweet_perc = (1 - topic_sentiment)*creator_prestige
+    elif value == 0:
+        retweet_perc = (0.5)*creator_prestige
+    elif value == 1:
+        retweet_perc = topic_sentiment*creator_prestige
+    return retweet_perc
+
    
 #quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
-'''
+
 print('running....')
+#path = '/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/data/nodes_with_community.gpickle'
 path = '../../data/nodes_with_community.gpickle'
-
-impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},{3: 0.1, 56: 0.8, 43: 0.1},{3: 0.8, 56: 0.1, 43: 0.8}]
-sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, {3: 0.7, 56: 0.3, 43: 0.7},{3: 0.7, 56: 0.3, 43: 0.7}]
-
-t = time.time()
-G = create_simulation_network(G=subset_graph(nx.read_gpickle(path), 
-                                communities=[3,56,43], outpath='sim_subset.gexf'), 
-                                perc_nodes_to_use = 0.1,
-                                numTopics = 3, 
-                                perc_bots = 0.01, 
-                                impactednesses = impactednesses, 
-                                sentiments = sentiments)
-
-print('making network took: {} seconds'.format(time.time() - t))
-
-for node, data in G.nodes(data=True):
-    print('node: {}, Community: {}, lambda {}, wake: {}, kind: {}, impactedness: {}, sentiment: {}'.format(node, 
-                                                                                                              data['Community'],
-                                                                                                              data['lambda'],
-                                                                                                              data['wake'],
-                                                                                                              data['kind'],
-                                                                                                              data['impactedness'],
-                                                                                                              data['sentiment']))
-
-'''
-    
-
-
-
-    
-    
-
-        
-
-
-
-
-        
-        
-        
-            
-
-
-
-
-def create_polarized_network(size = 100, bot_initial_links = 2, perc_bots = 0.05):
-    '''
-    Create polarized two community scale free network.  Populate basic node data
-    for normal users, bots, and stiflers.
-    '''
-    # Create Scale Free Graph
-    F = nx.scale_free_graph(size)
-    H = nx.scale_free_graph(size)
-    M = {}
-    for num in range(size):
-        M[num] = num + size
-    H = nx.relabel_nodes(H, M, copy=False)
-    G = nx.compose(F,H)
-    
-    for node, data in G.nodes(data=True):
-        data['lambda'] = np.random.uniform(0.001,0.75)
-        data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
-        data['inbox'] = []
-        data['mentioned_by'] = []
-
-        
-        
-        
-        '''
-        This is the key to polarized network. Compose two graphs F, H of same size into a single network, then 
-        for one group, have systematically lower belief (more truth). From this setup, it looks like beacons 
-        can only exist in one group (where node < size).
-        '''
-        if node < size:
-            data['belief'] = np.random.uniform(0,0.5)
-        else:
-            data['belief'] = np.random.uniform(0.5,1.0)
-        if data['belief'] < 0.2:
-            data['kind'] = 'beacon'
-        else:
-            data['kind'] = 'normal'
-    
-    '''
-    Bots are added to the periphery of the network
-    '''    
-    #  Add Bots
-    num_bots = int(np.round(len(G.nodes)*perc_bots))
-    bot_names = [len(G) + i for i in range(num_bots)]
-    for bot_name in bot_names:
-        initial_links = random.sample(G.nodes, bot_initial_links)
-        G.add_node(bot_name)
-        for link in initial_links:
-            G.add_edge(bot_name,link)
-    # Add Bot Data      
-    for node, data in G.nodes(data=True):
-        if node in bot_names:
-            '''
-            Bots have a much higher inter-arival time
-            '''
-            data['lambda'] = np.random.uniform(0.1,0.75)
-            data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
-            data['inbox'] = []
-            data['belief'] = np.random.uniform(0.95,1.0)
-            data['kind'] = 'bot'
-            data['mentioned_by'] = []
-        
-    ## Remove self_loops and isololates
-    G.remove_edges_from(list(G.selfloop_edges()))
-    G.remove_nodes_from(list(nx.isolates(G)))
-    
-    # Ensure every node has outdegree > 0 (otherwise similarity fails)
-    A = nx.adjacency_matrix(G).astype(bool)
-    b = np.squeeze(np.asarray(A.sum(axis = 1)))
-    b = np.argwhere(b==0)
-    for node in b:
-        connected = [to for (fr, to) in G.edges(node)]
-        unconnected = [n for n in G.nodes() if not n in connected] 
-        new = random.sample(unconnected,1)
-        G.add_edge(node[0], new[0])
-        
-    return(G)
+outpath_info = '../output/all_info.pickle'
+outpath_node_info = '../output/node_info.pickle'
+num_topics = 4
 
 
 
 '''
-We need a much more scalable method for assessing similarity 
-if we intend to use this. Maybe we can just calculate distance?
+First topic (row) impacts every group the same, the other topics each impact 
+one group significantly more than the others
 '''
 
-def link_prediction(G, node,similarity):
-    '''
-    This function takes the graph G, a given node, and the jaccard similarity 
-    matrix for the nodes, and returns recommended link based on similarity.  
-    '''
-    ## Potential links are drawn from those whoe follow the same accounts 
-    potential = []
-    successors = G.successors(node)
-    predecessors = list(G.predecessors(node)) 
-    for successor in successors:
-        friends = G.predecessors(successor)
-        for friend in friends:
-            if friend != node:
-                potential.append(friend)
-    # If potential exists, find highest similarity, otherwise sample from predecessors
-    final = []
-    if len(potential) > 0:
-        jaccard1 = similarity[node,potential]
-        i = np.argmax(jaccard1)
-        link = (node,potential[i])
-        if ~G.has_edge(link[0],link[1]):
-            final.append(link)
-    elif len(predecessors) > 0:
-        get_one = random.sample(list(predecessors),1)
-        link = (node,get_one[0])
-        if ~G.has_edge(link[0],link[1]):
-            final.append(link)
-    return(final)
+
+impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},
+                  {3: 0.8, 56: 0.1, 43: 0.1},
+                  {3: 0.1, 56: 0.8, 43: 0.1},
+                  {3: 0.1, 56: 0.1, 43: 0.8}]
+
+'''
+For the first topic (which everyone cares about equally), belief is roughly average (50%). 
+For the other topics, if a community is more impacted by a topic, we assume that their 
+average belief is lower, indicating that they have more knowledge of the truth than the 
+other communities that are not impacted  by the topic.
+'''
+sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, 
+              {3: 0.2, 56: 0.8, 43: 0.8}, 
+              {3: 0.8, 56: 0.2, 43: 0.8},
+              {3: 0.8, 56: 0.8, 43: 0.2}]
 
 
-def run(G, size = 100, perc_bots = 0.05, strategy = 'normal', polarized = 'normal'):
+G = nx.read_gpickle(path)
+subG = subset_graph(G, communities=[3,56,43])
+sampleG = create_simulation_network(G=subG, 
+                              perc_nodes_to_use = 0.1,
+                              numTopics = num_topics, 
+                              perc_bots = 0.05, 
+                              impactednesses = impactednesses, 
+                              sentiments = sentiments)
+del G
+del subG
+
+
+
+
+
+
+
+def run(G, runtime):
     '''
     This executes a single run of the twitter_sim ABM model
     '''
     ##################################
-    influence_proportion = 0.01
-    bucket1 = [0,1]
-    bucket2 = [0,-1]
-    probability_of_link = 0.05
-    dynamic_network = True
     global_perception = 0.00000001
-    retweet_perc = 0.25
-    allowed_successors = 0.2
-    
+    num_topics = 4
+
     # Create scale free network
-    
-    #Create initial simlilarity and prestige arrays
+
     '''
-    Note - we need to find another, more scalable way to measure similarity - cannot create a 315kx315k matrix
+    Prestige is degree - this makes nodes more likely to retweet info that comes from high degree users
     '''
-    A = nx.adjacency_matrix(G).astype(bool) 
-    similarity = 1 - pairwise_distances(A.todense(), metric = 'jaccard')
-    prestige = scale(list(dict(G.degree()).values()))
-    
+    prestige_values = percentile(list(dict(G.degree()).values()))
+    nodes = list(G.nodes())
+    prestige = {nodes[i]: prestige_values[i] for i in range(len(nodes))}
     # Initialize objects to collect results
-    total_tweets = []
-    all_beliefs = {'time':[],'user':[],'beliefs':[], 'kind':[]}
+    all_info = {}
+    # This will capture the unique-ids of each tweet read by each node.
+    node_read_tweets = {node:[] for node in G.nodes()}
+    
+    topics = list(range(num_topics))
+    rankings = calculate_sentiment_rankings(G = G, topics = topics)
+
+
     bar = progressbar.ProgressBar()
-    for step in bar(range(1680)):
-        # Once a week we update the similarity matrix and Global Perception and prestige
-        if (step % 168) == 0:
-            A = nx.adjacency_matrix(G).astype(bool)
-            similarity = 1 - pairwise_distances(A.todense(), metric = 'jaccard')
-            prestige = scale(list(dict(G.in_degree()).values()))
-            
-            ## Update Global Perception
-            if len(total_tweets) > 0:
-                df = pd.concat(total_tweets)
-                global_perception = 0.001*df['tweets'].mean()
+    for step in bar(range(runtime)):
         # Loop over all nodes
         '''
         Users and Information interact
         '''
         for node, data in G.nodes(data=True):
-            all_beliefs['time'].append(step)
-            all_beliefs['user'].append(node);
-            all_beliefs['beliefs'].append(data['belief']);
-            all_beliefs['kind'].append(data['kind'])
             # Check if User logs on for this Time Step
-            if data['wake'] < step:
-                retweets = []
+           # print(node + '\n\n\n')
+            if data['wake'] == step:
                 # Get new 'wake' time
-                data['wake'] = data['wake'] + np.round(np.random.exponential(scale = 1 / data['lambda']))
-                # Read Tweets
-                if len(data['inbox']) > 0:
-                    number_to_read = min(random.randint(4,20),len(data['inbox']))
-                    '''
-                    Tweets need to have a topic associated with them.
-                    Maybe we should sort by impactedness here?
-                    '''
-                    read_tweets = data['inbox'][-number_to_read:]
-                    perc = np.mean(read_tweets)
-                    # Update Belief
-                    if (perc + global_perception) > 0:
-                        new_belief = data['belief'] +   (perc + global_perception) * (1-data['belief'])
-                    else:
-                        new_belief = data['belief'] +   (perc + global_perception) * (data['belief'])
-                    data['belief'] = new_belief  
-                    # Get retweets from read tweets
-                    '''
-                    retweet_perc should be dependent on the community's relation to a particular topic.
-                    Groups that find a particular topic engaging or important have a higher chance of retweeting 
-                    the tweet
-                    '''
-                    retweets = random.sample(read_tweets, round(retweet_perc*len(read_tweets)))
-                # Send Tweets for bots
+                #print('\n\n\n They are awake! - ' + str(node) + '\n\n\n')
+
+                data['wake'] = data['wake'] + \
+                    np.round(1 + np.random.exponential(scale=1 / data['lambda']))
+                
+                '''
+                Tweeting Behavior
+                '''
+                
                 if data['kind'] == 'bot':
-                    chance = 0.8
-                    tweets = list(choice(bucket1, np.random.randint(0,10),p=[1-chance, chance]))
+                    chance = 1 # bots tweet every time they are awake
+                elif data['kind'] != 'bot':
+                    # humans tweet proportionally to their degree
+                    chance = prestige[node]
                     
-                # Send Tweets for Stiflers/Beacons
-                elif (data['kind'] == 'beacon') and ('read_tweets' in locals()):
-                    '''
-                    Little unclear here. What is num_dis? We assume they read 30 tweets?
-                    -1 represents anti-misinformation, so I believe the idea here is that
-                    they will write up to 30 pieces of anti-disinformation because they tend
-                    to be very active users
-                    '''
-                    read_tweets = data['inbox'][-30:]
-                    num_dis = np.sum(np.array(read_tweets) > 0)
-                    tweets = [-1] * num_dis
+                new_tweets = []
+                if chance > np.random.uniform():
+                    #print('Here we go!\n\n\n Node ' + str(node) + '\n\n\n')
+                    num_tweets = np.random.randint(1,10)
+                    for i in range(num_tweets):
+                        topic = choose_topic(data = data)
+                        value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
+                        claim = choose_claim(value = value)
+                        unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
+                        all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
+                        new_tweets.append(unique_id)
+                #else:
+                    #print('No Go \n\n\n Node ' + str(node) + '\n\n\n')
+                               
+                   
+                '''
                     
-                # Send Tweets for normal users
-                else:
-                    '''
-                    Why is this the chance? What does their influence_proportion have to do with
-                    their probability of retweeting noise and misinformation? Also, we assume that 
-                    they won't retweet anti-misinformation. Why?
-                    '''
-                    chance = data['belief'] * influence_proportion
-#                    chance = 0   # Normal users only send disinformation with retweets
-                    tweets = list(choice(bucket1, np.random.randint(0,10),p=[1-chance, chance]))
-                tweets.extend(retweets)
-                total_tweets.append(pd.DataFrame({'tweets': tweets, 'time' :[step] * len(tweets)}))
-                predecessors = G.predecessors(node)
-                
-                
-                '''
-                Pass information on to followers
-                '''
-                for follower in predecessors:
-                    homophily = similarity[node,follower]
-                    importance =  prestige[follower]
-                    tweets = [homophily * importance * i for i in tweets]
-                    G.nodes[follower]['inbox'].extend(tweets)
+                Read tweets, update beliefs, and re-tweet
                     
-                # Send Mentions
-                neighbors = list(G.neighbors(node))
-                '''
-                What is going on with the mention?
-                '''
-                mention = random.sample(neighbors,1)[0]
-                G.nodes[mention]['mentioned_by'].append(node)
-                    
-                
-                '''
-                Adding new links
-                
-                Perhaps instead of link_prediction() which computes a matrix, we could look at the set 
-                of all nodes within a certain distance and randomly connect them using something like:
-                
-                radius = 3 # Degrees of separation
-                new_graph = nx.generators.ego_graph(graph, node, radius=radius)
-                random.sample(set(new_graph.nodes) - set(successors), 1)
+                '''               
 
-                '''
-                # Make sure doesn't have too many successors already
-                successors = list(G.successors(node)) + [node]
-                if len(successors) < allowed_successors * len(G.nodes) and (dynamic_network):
-                    # If probabliliy right, add link for non-bot users
-                    if (np.random.uniform(0,1) < probability_of_link) and (data['kind'] != 'bot'):
-                        new_link = link_prediction(G,node,similarity)
-                        if len(new_link) > 0:
-                            G.add_edges_from(new_link) 
+                retweets = []
+                if len(data['inbox']) > 0:
+                    number_to_read = min(random.randint(4, 20), len(data['inbox']))
+                    read_tweets = data['inbox'][-number_to_read:]
+                    retweet_perc = []
+                    new_retweets = []
+                    for read_tweet in read_tweets:
+                        if read_tweet not in node_read_tweets[node]:
+                            topic = all_info[read_tweet]['topic']
+                            value = all_info[read_tweet]['value']
+                            topic_sentiment = data['sentiment'][topic]
+                            creator_prestige = prestige[all_info[read_tweet]['node-origin']]
 
-                    # If probabliliy right, add link to a mention
-                    if (np.random.uniform(0,1) < probability_of_link) and (len(data['mentioned_by']) > 0):
-                        new_link = random.sample(data['mentioned_by'],1)
-                        if len(new_link) > 0:
-                            G.add_edge(node, new_link[0]) 
-                    # Bots try to add link every time
-                    if (data['kind'] == 'bot'):
-                        potential = list(set(G.nodes) - set(successors))
-                        if len(potential) > 0:
-                            if strategy == 'targeted':
-                                degree = dict(G.in_degree(potential))
-                                new_link = max(degree.items(), key=operator.itemgetter(1))[0]
-                            else:
-                                new_link = random.sample(list(potential),1)[0]
-                            G.add_edge(node,new_link)
-    return(pd.DataFrame(all_beliefs),pd.concat(total_tweets), G )
+                            '''
+                            update beliefs here
+                            '''
+                            ## update beliefs
+                            # if (perc + global_perception) > 0:
+                            #     new_belief = data['belief'] + \
+                            #         (perc + global_perception) * (1-data['belief'])
+                            # else:
+                            #     new_belief = data['belief'] + \
+                            #         (perc + global_perception) * (data['belief'])
+                            #data['belief'] = new_belief
+                            ## 
+                            '''
+                            retweet behavior
+                            '''
+                            perc = retweet_behavior(topic = topic, value=value, topic_sentiment=topic_sentiment,creator_prestige=creator_prestige)
+                            retweet_perc.append(perc)
+                            new_retweets.append(read_tweet) 
+                            # updates the tweets that nodes have read
+                            node_read_tweets[node].append(read_tweet)
+                            
+                    for i in range(len(new_retweets)):
+                        if retweet_perc[i] > np.random.uniform():
+                            retweets.append(new_retweets[i])
+                    # clear inbox
+                    data['inbox'] = []
+                
+                
+
+                    '''
+                    Pass information on to followers
+                    '''
+                new_tweets.extend(retweets)
+                if len(new_tweets) > 0:
+                    predecessors = G.predecessors(node)
+                    for follower in predecessors:
+                        G.nodes[follower]['inbox'].extend(new_tweets)
+
+
+    return all_info, node_read_tweets
+
+
+
+all_info, node_read_tweets = run(G = sampleG, runtime = 1000)
+
+with open(outpath_info, 'wb') as file:
+    pickle.dump(all_info, file, protocol=pickle.HIGHEST_PROTOCOL)
+    
+with open(outpath_node_info, 'wb') as file:
+    pickle.dump(node_read_tweets, file, protocol=pickle.HIGHEST_PROTOCOL)

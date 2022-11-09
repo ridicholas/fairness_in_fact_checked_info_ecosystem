@@ -106,10 +106,11 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
 
 
         
-        if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
-            data['kind'] = 'beacon'
-        else:
-            data['kind'] = 'normal'
+        if data['kind'] != 'bot':
+            if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
+                data['kind'] = 'beacon'
+            else:
+                data['kind'] = 'normal'
 
     ## Remove self_loops and isololates
     G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
@@ -144,9 +145,9 @@ average belief is lower, indicating that they have more knowledge of the truth t
 other communities that are not impacted  by the topic.
 '''
 sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, 
-              {3: 0.4, 56: 0.7, 43: 0.7}, 
-              {3: 0.7, 56: 0.4, 43: 0.7},
-              {3: 0.7, 56: 0.7, 43: 0.4}]
+              {3: 0.2, 56: 0.8, 43: 0.8}, 
+              {3: 0.8, 56: 0.2, 43: 0.8},
+              {3: 0.8, 56: 0.8, 43: 0.2}]
 
 
 t = time.time()
@@ -244,10 +245,12 @@ def choose_claim(value: int):
 
 
 
-all_info = {'topic':[],'claim':[],'value':[],'node-origin':[],'node-community':[], 'time-origin':[]}
+all_info = {}
+
 topics = list(range(num_topics))
 t = 1
 rankings = calculate_sentiment_rankings(G = sampleG, topics = topics)
+
 
 '''
 This is an example run, where we create information for every node in the dataset.
@@ -260,12 +263,10 @@ for node, data in sampleG.nodes(data=True):
     topic = choose_topic(data = data)
     value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
     claim = choose_claim(value = value)
-    all_info['topic'].append(topic)
-    all_info['value'].append(value)
-    all_info['claim'].append(claim)
-    all_info['node-community'].append(data['Community'])
-    all_info['node-origin'].append(node)
-    all_info['time-origin'].append(t)
+
+    unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(t)
+    all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':t}})
+
 
 
 print('\n\n\nTopic Distribution\n\n\n')
