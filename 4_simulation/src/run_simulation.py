@@ -43,6 +43,7 @@ def percentile(x):
 
 def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics: int, perc_bots: float, impactednesses: list, sentiments: list):
     '''
+
     Will create a network for simulation using input graph and provided community level attitudes towards topics
 
     :param G: input digraph
@@ -56,6 +57,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
                             sentiment value towards topic i.
                             (this value will be used as mean for drawing distribution)
     :return: returns new network where nodes have impactedness, sentiments, and are bots
+
     
     '''
 

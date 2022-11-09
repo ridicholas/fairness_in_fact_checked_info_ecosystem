@@ -112,8 +112,6 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
             else:
                 data['kind'] = 'normal'
 
-
-
     ## Remove self_loops and isololates
     G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
     G.remove_nodes_from(list(nx.isolates(G)))
@@ -124,7 +122,6 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
 #quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
 
 print('running....')
-path = '/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/data/nodes_with_community.gpickle'
 path = '../../data/nodes_with_community.gpickle'
 num_topics = 4
 
@@ -249,14 +246,10 @@ def choose_claim(value: int):
 
 
 all_info = {}
+
 topics = list(range(num_topics))
 t = 1
 rankings = calculate_sentiment_rankings(G = sampleG, topics = topics)
-
-
-
-
-
 
 
 '''
@@ -270,8 +263,10 @@ for node, data in sampleG.nodes(data=True):
     topic = choose_topic(data = data)
     value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
     claim = choose_claim(value = value)
+
     unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(t)
     all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':t}})
+
 
 
 print('\n\n\nTopic Distribution\n\n\n')
