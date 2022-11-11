@@ -238,6 +238,7 @@ outpath_info = '../output/all_info.pickle'
 outpath_node_info = '../output/node_info.pickle'
 outpath_community_sentiment = '../output/community_sentiment.pickle'
 outpath_node_time_info = '../output/node_time_info.pickle'
+subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
 NUM_CLAIMS = 100 #this is number of claims per topic per timestep
@@ -266,12 +267,9 @@ sentiments = [{3: 0.5, 56: 0.5, 43: 0.5},
               {3: 0.8, 56: 0.8, 43: 0.2}]
 
 
-G = nx.read_gpickle(path)
-subG = subset_graph(G, communities=communities_to_subset)
-sampleG = create_simulation_network(G=subG, 
-if os.path.isfile('../output/simulation_net.gpickle'):
+if os.path.isfile(subset_graph_file):
         print('found simulation network file, loading from file')
-        with open("../output/simulation_net.gpickle", "rb") as f:
+        with open(subset_graph_file, "rb") as f:
             sampleG = pickle.load(f)
 else:
     print('simulation net file not found, creating it now')
@@ -286,7 +284,7 @@ else:
     del G
     del subG
 
-    nx.write_gpickle(sampleG, '../output/simulation_net.gpickle')
+    nx.write_gpickle(sampleG, subset_graph_file)
 
 
 
