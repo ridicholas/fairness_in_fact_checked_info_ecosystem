@@ -88,10 +88,12 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
         #set everything else
         data['impactedness'] = {}
         data['sentiment'] = {}
+        data['num_read'] = {}
 
         for topic in range(numTopics):
             data['impactedness'][topic] = np.max([0, np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
             data['sentiment'][topic] = np.max([0, np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
+            data['num_read'][topic] = np.random.normal(impactednesses[topic][data['Community']]*100, scale = 10)
         
         data['belief'] = np.array(list(data['sentiment'].values())).mean() #make belief an average of sentiments? then what we are interested in are changes in belief due to misinfo?
 
@@ -221,7 +223,14 @@ def retweet_behavior(topic, value, topic_sentiment, creator_prestige):
         retweet_perc = topic_sentiment*creator_prestige
     return retweet_perc
 
-   
+
+def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, num_read):
+    # online mean updating
+    new_sentiment = (num_read - 1)/(num_read)*current_sentiment + (1/num_read)*tweet_value*tweet_impactedness
+    return new_sentiment
+    
+
+
 #quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
 
 print('running....')
@@ -229,8 +238,9 @@ print('running....')
 path = '../../data/nodes_with_community.gpickle'
 outpath_info = '../output/all_info.pickle'
 outpath_node_info = '../output/node_info.pickle'
+outpath_community_sentiment = '../output/community_sentiment.pickle'
 num_topics = 4
-
+communities_to_subset = [3,56,43]
 
 
 '''
@@ -257,7 +267,7 @@ sentiments = [{3: 0.5, 56: 0.5, 43: 0.5},
 
 
 G = nx.read_gpickle(path)
-subG = subset_graph(G, communities=[3,56,43])
+subG = subset_graph(G, communities=communities_to_subset)
 sampleG = create_simulation_network(G=subG, 
                               perc_nodes_to_use = 0.1,
                               numTopics = num_topics, 
@@ -293,6 +303,7 @@ def run(G, runtime):
     all_info = {}
     # This will capture the unique-ids of each tweet read by each node.
     node_read_tweets = {node:[] for node in G.nodes()}
+    community_sentiment_through_time = {com:{t:{topic: [] for topic in range(num_topics)} for t in range(runtime)} for com in communities_to_subset}
     
     topics = list(range(num_topics))
     rankings = calculate_sentiment_rankings(G = G, topics = topics)
@@ -359,17 +370,13 @@ def run(G, runtime):
                             creator_prestige = prestige[all_info[read_tweet]['node-origin']]
 
                             '''
-                            update beliefs here
+                            update beliefs for each topic
                             '''
-                            ## update beliefs
-                            # if (perc + global_perception) > 0:
-                            #     new_belief = data['belief'] + \
-                            #         (perc + global_perception) * (1-data['belief'])
-                            # else:
-                            #     new_belief = data['belief'] + \
-                            #         (perc + global_perception) * (data['belief'])
-                            #data['belief'] = new_belief
-                            ## 
+                            data['num_read'][topic] += 1
+                            data['sentiment'][topic] = update_topic_sentiment(current_sentiment=data['sentiment'][topic], 
+                                                                              tweet_value = value, 
+                                                                              tweet_impactedness=data['impactedness'][topic], 
+                                                                              num_read = data['num_read'][topic])
                             '''
                             retweet behavior
                             '''
@@ -387,24 +394,33 @@ def run(G, runtime):
                 
                 
 
-                    '''
-                    Pass information on to followers
-                    '''
+                '''
+                Pass information on to followers
+                '''
                 new_tweets.extend(retweets)
                 if len(new_tweets) > 0:
                     predecessors = G.predecessors(node)
                     for follower in predecessors:
                         G.nodes[follower]['inbox'].extend(new_tweets)
+                        
+                '''
+                Capture sentiment across topics for node
+                '''
+                for topic in range(num_topics):
+                    community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets
+    return all_info, node_read_tweets, community_sentiment_through_time
 
 
 
-all_info, node_read_tweets = run(G = sampleG, runtime = 1000)
+all_info, node_read_tweets, community_sentiment_through_time = run(G = sampleG, runtime = 1000)
 
 with open(outpath_info, 'wb') as file:
     pickle.dump(all_info, file, protocol=pickle.HIGHEST_PROTOCOL)
     
 with open(outpath_node_info, 'wb') as file:
     pickle.dump(node_read_tweets, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open(outpath_community_sentiment, 'wb') as file:
+    pickle.dump(community_sentiment_through_time, file, protocol=pickle.HIGHEST_PROTOCOL)
