@@ -225,8 +225,8 @@ def retweet_behavior(topic, value, topic_sentiment, creator_prestige):
 
 
 def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, num_read):
-    # online mean updating
-    new_sentiment = (num_read - 1)/(num_read)*current_sentiment + (1/num_read)*tweet_value*tweet_impactedness
+    # iterative mean updating of beliefs
+    new_sentiment = ((num_read - 1)/(num_read))*current_sentiment + (1/num_read)*tweet_value*tweet_impactedness
     return new_sentiment
     
 
