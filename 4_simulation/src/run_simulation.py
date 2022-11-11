@@ -168,7 +168,7 @@ def choose_info_quality(node: str, rankings: pd.DataFrame, topic: int, agent_typ
     return value
 
 
-def choose_claim(value: int):
+def choose_claim(value: int, num_claims: int):
     '''
     Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair 
     is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
@@ -184,11 +184,11 @@ def choose_claim(value: int):
     '''
     
     if value == -1:
-        claim = random.sample(list(range(0,33)), k=1)[0]
+        claim = random.sample(list(range(0,int(num_claims/3))), k=1)[0]
     elif value == 0:
-        claim = random.sample(list(range(33,66)), k=1)[0]
+        claim = random.sample(list(range(int(num_claims/3),int(num_claims/3)*2)), k=1)[0]
     elif value == 1:
-        claim = random.sample(list(range(66,100)), k=1)[0]
+        claim = random.sample(list(range(int(num_claims/3)*2,num_claims)), k=1)[0]
     return claim
 
 def subset_graph(G, communities=None):
@@ -222,13 +222,13 @@ def retweet_behavior(topic, value, topic_sentiment, creator_prestige):
     return retweet_perc
 
    
-#quick test to see if it works with 3 communities and 3 topics, uncomment below to run with test
 
 print('running....')
 #path = '/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/data/nodes_with_community.gpickle'
 path = '../../data/nodes_with_community.gpickle'
 outpath_info = '../output/all_info.pickle'
 outpath_node_info = '../output/node_info.pickle'
+outpath_node_time_info = '../output/node_time_info.pickle'
 num_topics = 4
 
 
@@ -256,22 +256,27 @@ sentiments = [{3: 0.5, 56: 0.5, 43: 0.5},
               {3: 0.8, 56: 0.8, 43: 0.2}]
 
 
-G = nx.read_gpickle(path)
-subG = subset_graph(G, communities=[3,56,43])
-sampleG = create_simulation_network(G=subG, 
+if os.path.isfile('../output/simulation_net.gpickle'):
+        print('found simulation network file, loading from file')
+        with open("../output/simulation_net.gpickle", "rb") as f:
+            sampleG = pickle.load(f)
+else:
+    print('simulation net file not found, creating it now')
+    G = nx.read_gpickle(path)
+    subG = subset_graph(G, communities=[3,56,43])
+    sampleG = create_simulation_network(G=subG, 
                               perc_nodes_to_use = 0.1,
                               numTopics = num_topics, 
                               perc_bots = 0.05, 
                               impactednesses = impactednesses, 
                               sentiments = sentiments)
-del G
-del subG
+    del G
+    del subG
+
+    nx.write_gpickle(sampleG, '../output/simulation_net.gpickle')
 
 
-
-
-
-
+NUM_CLAIMS = 100 #this is number of claims per topic per timestep
 
 def run(G, runtime):
     '''
@@ -293,6 +298,8 @@ def run(G, runtime):
     all_info = {}
     # This will capture the unique-ids of each tweet read by each node.
     node_read_tweets = {node:[] for node in G.nodes()}
+    node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
+    
     
     topics = list(range(num_topics))
     rankings = calculate_sentiment_rankings(G = G, topics = topics)
@@ -331,7 +338,7 @@ def run(G, runtime):
                     for i in range(num_tweets):
                         topic = choose_topic(data = data)
                         value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
-                        claim = choose_claim(value = value)
+                        claim = choose_claim(value = value, num_claims=NUM_CLAIMS)
                         unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
@@ -347,7 +354,7 @@ def run(G, runtime):
 
                 retweets = []
                 if len(data['inbox']) > 0:
-                    number_to_read = min(random.randint(4, 20), len(data['inbox']))
+                    number_to_read = min(random.randint(4, 20), len(data['inbox'])) #should this be fully random?
                     read_tweets = data['inbox'][-number_to_read:]
                     retweet_perc = []
                     new_retweets = []
@@ -378,6 +385,7 @@ def run(G, runtime):
                             new_retweets.append(read_tweet) 
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
+                            node_read_tweets_by_time[node][step].append(read_tweet)
                             
                     for i in range(len(new_retweets)):
                         if retweet_perc[i] > np.random.uniform():
@@ -397,14 +405,17 @@ def run(G, runtime):
                         G.nodes[follower]['inbox'].extend(new_tweets)
 
 
-    return all_info, node_read_tweets
+    return all_info, node_read_tweets, node_read_tweets_by_time
 
 
 
-all_info, node_read_tweets = run(G = sampleG, runtime = 1000)
+all_info, node_read_tweets, node_read_tweets_by_time = run(G = sampleG, runtime = 1000)
 
 with open(outpath_info, 'wb') as file:
     pickle.dump(all_info, file, protocol=pickle.HIGHEST_PROTOCOL)
     
 with open(outpath_node_info, 'wb') as file:
     pickle.dump(node_read_tweets, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open(outpath_node_time_info, 'wb') as file:
+    pickle.dump(node_read_tweets_by_time, file, protocol=pickle.HIGHEST_PROTOCOL)
