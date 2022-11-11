@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 import progressbar
+import fastparquet
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -12,22 +13,30 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 
-def plot_total_reads_over_time(by_community=False):
+def plot_total_reads_over_time(by_community=False, specific_topic=None):
 
-    misinfo = pd.read_pickle('../output/node_by_time_misinfo.pickle')
-    anti = pd.read_pickle('../output/node_by_time_anti.pickle')
-    noise = pd.read_pickle('../output/node_by_time_noise.pickle')
+    if specific_topic != None:
+        misinfo = pd.read_pickle('../output/topic{}_node_by_time_misinfo.pickle'.format(specific_topic))
+        anti = pd.read_pickle('../output/topic{}_node_by_time_anti.pickle'.format(specific_topic))
+        noise = pd.read_pickle('../output/topic{}_node_by_time_noise.pickle'.format(specific_topic))
+    else:
+        misinfo = pd.read_pickle('../output/node_by_time_misinfo.pickle')
+        anti = pd.read_pickle('../output/node_by_time_anti.pickle')
+        noise = pd.read_pickle('../output/node_by_time_noise.pickle')
     
     plt.plot(list(range(1000)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
     plt.plot(list(range(1000)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
     plt.plot(list(range(1000)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
     plt.xlabel('Time')
     plt.ylabel('# of Reads')
-    plt.title('Total Information Read over Time')
+    if specific_topic:
+        plt.title('Total Topic {} Information Read over Time'.format(specific_topic))
+    else:
+        plt.title('Total Information Read over Time')
     plt.legend()
     plt.show()
 
-    if by_community():
+    if by_community:
         communities = [3, 56, 43]
         plt.clf()
         fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharey=True)
@@ -39,7 +48,10 @@ def plot_total_reads_over_time(by_community=False):
             axs[i].plot(list(range(1000)), anti[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
             axs[i].set_xlabel('Time')
             axs[i].set_ylabel('# of Reads')
-            axs[i].set_title('Information Read over Time by Community {}'.format(community))
+            if specific_topic:
+                axs[i].set_title('Topic {} Information Read over Time by Community {}'.format(specific_topic, community))
+            else:
+                axs[i].set_title('Information Read over Time by Community {}'.format(community))
             axs[i].legend()
             i+=1
     else:
@@ -57,12 +69,12 @@ def plot_total_reads_over_time(by_community=False):
     del anti
     del noise
 
-def plot_claims_over_time(claims=None, topics=None, by_community=False):
+def plot_claims_over_time(claims=None, by_community=False):
     '''
-    Have to provide claims or topics to plot
+    Have to provide claims to plot
     '''
 
-    if claims!=None and topics==None:
+    if claims!=None:
         comm3 = pd.read_pickle('../output/claim_by_time_community3.pickle')
         community3spread = comm3.loc[claims, :]
         del comm3
@@ -99,18 +111,23 @@ def plot_claims_over_time(claims=None, topics=None, by_community=False):
                     axs[i].legend()
                 i+=1
             plt.show()
-    
-    elif topics!=None and claims==None:
-        pass
+        
     else:
         print('Gotta provide either topics or claims try again friend')
 
+
+plot_total_reads_over_time(by_community=True, specific_topic='0')
+plot_total_reads_over_time(by_community=True, specific_topic='1')
+plot_total_reads_over_time(by_community=True, specific_topic='2')
+plot_total_reads_over_time(by_community=True, specific_topic='3')
+#plot_total_reads_over_time(by_community=True)
 
 
 #Some example things we can do, should come up with more interesting stuff to plot
 #Should also consider a better way to work with the claim by time data which are 3 yuge files
 
-plot_total_reads_over_time(by_community=False)
-plot_total_reads_over_time(by_community=True)
-plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=False)
-plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=True)
+#plot_total_reads_over_time(by_community=False)
+#plot_total_reads_over_time(by_community=True)
+#plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=False)
+#plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=True)
+#plot_claims_over_time(topics = ['0'], by_community=False)
