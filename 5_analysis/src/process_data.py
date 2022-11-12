@@ -51,13 +51,15 @@ def make_node_by_time_frame(G, all_info, node_read_tweets_by_time, steps, topic_
         for step in range(steps):
             for claim in node_read_tweets_by_time[node][step]:
                 #look up claim properties in all_info and add it to appropriate count
-                value = all_info[claim]['value']
-                if value == -1:
-                    anti_frame.loc[node, step] += 1
-                elif value == 0:
-                    noise_frame.loc[node, step] += 1
-                else:
-                    misinfo_frame.loc[node, step] += 1
+                topic = claim[0]
+                if topic==topic_filter:
+                    value = all_info[claim]['value']
+                    if value == -1:
+                        anti_frame.loc[node, step] += 1
+                    elif value == 0:
+                        noise_frame.loc[node, step] += 1
+                    else:
+                        misinfo_frame.loc[node, step] += 1
         
 
 
@@ -94,26 +96,33 @@ def make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, steps, commu
     return frame
 
 
+topics = ['0', '1', '2', '3']
+for topic in topics:
+    node_by_time_anti, node_by_time_noise, node_by_time_misinfo = make_node_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, topic_filter=topic)
+    node_by_time_misinfo.to_pickle('../output/topic{}_node_by_time_misinfo.pickle'.format(topic))
+    node_by_time_noise.to_pickle('../output/topic{}_node_by_time_noise.pickle'.format(topic))
+    node_by_time_anti.to_pickle('../output/topic{}_node_by_time_anti.pickle'.format(topic))
+    del node_by_time_anti
+    del node_by_time_noise
+    del node_by_time_misinfo
+
 node_by_time_anti, node_by_time_noise, node_by_time_misinfo = make_node_by_time_frame(G, all_info, node_read_tweets_by_time, 1000)
-node_by_time_misinfo.to_pickle('../output/node_by_time_misinfo.pickle')
-node_by_time_noise.to_pickle('../output/node_by_time_noise.pickle')
-node_by_time_anti.to_pickle('../output/node_by_time_anti.pickle')
-del node_by_time_anti
-del node_by_time_noise
-del node_by_time_misinfo
+node_by_time_misinfo.to_pickle('../output/node_by_time_misinfo.pickle'.format(topic))
+node_by_time_noise.to_pickle('../output/node_by_time_noise.pickle'.format(topic))
+node_by_time_anti.to_pickle('../output/node_by_time_anti.pickle'.format(topic))
 
-claim_by_time_frame3 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=3)
-claim_by_time_frame3.to_pickle('../output/claim_by_time_community3.pickle')
-del claim_by_time_frame3
+#claim_by_time_frame3 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=3)
+#claim_by_time_frame3.to_pickle('../output/claim_by_time_community3.pickle')
+#del claim_by_time_frame3
 
 
-claim_by_time_frame56 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=56)
-claim_by_time_frame56.to_pickle('../output/claim_by_time_community56.pickle')
+#claim_by_time_frame56 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=56)
+#claim_by_time_frame56.to_pickle('../output/claim_by_time_community56.pickle')
 
-del claim_by_time_frame56
+#del claim_by_time_frame56
 
-claim_by_time_frame43 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=43)
-claim_by_time_frame43.to_pickle('../output/claim_by_time_community43.pickle')
+#claim_by_time_frame43 = make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, 1000, community=43)
+#claim_by_time_frame43.to_pickle('../output/claim_by_time_community43.pickle')
 
 
 
