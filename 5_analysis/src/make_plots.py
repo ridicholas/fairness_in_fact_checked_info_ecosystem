@@ -5,48 +5,63 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 import progressbar
+import fastparquet
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+my_dpi = 96
+communities_to_subset = [3, 56, 43]
+runtime = 500
+def plot_total_reads_over_time(by_community=False, specific_topic=None):
 
+    if specific_topic != None:
+        misinfo = pd.read_pickle('../output/topic{}_node_by_time_misinfo.pickle'.format(specific_topic))
+        anti = pd.read_pickle('../output/topic{}_node_by_time_anti.pickle'.format(specific_topic))
+        noise = pd.read_pickle('../output/topic{}_node_by_time_noise.pickle'.format(specific_topic))
+    else:
+        misinfo = pd.read_pickle('../output/node_by_time_misinfo.pickle')
+        anti = pd.read_pickle('../output/node_by_time_anti.pickle')
+        noise = pd.read_pickle('../output/node_by_time_noise.pickle')
 
-
-
-def plot_total_reads_over_time(by_community=False):
-
-    misinfo = pd.read_pickle('../output/node_by_time_misinfo.pickle')
-    anti = pd.read_pickle('../output/node_by_time_anti.pickle')
-    noise = pd.read_pickle('../output/node_by_time_noise.pickle')
-    
-    plt.plot(list(range(1000)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
-    plt.plot(list(range(1000)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
-    plt.plot(list(range(1000)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
+    plt.figure(figsize=(1000/my_dpi, 800/my_dpi), dpi=my_dpi)
+    plt.plot(list(range(runtime)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
+    plt.plot(list(range(runtime)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
+    plt.plot(list(range(runtime)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
     plt.xlabel('Time')
     plt.ylabel('# of Reads')
-    plt.title('Total Information Read over Time')
+    if specific_topic:
+        plt.title('Total Topic {} Information Read over Time'.format(specific_topic))
+    else:
+        plt.title('Total Information Read over Time')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('../output/total_topic_{}.png'.format(specific_topic))
 
-    if by_community():
-        communities = [3, 56, 43]
+    if by_community:
         plt.clf()
+        plt.figure(figsize=(8000/my_dpi, 800/my_dpi), dpi=my_dpi)
         fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharey=True)
         i=0
-        for community in communities:
-
-            axs[i].plot(list(range(1000)), misinfo[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
-            axs[i].plot(list(range(1000)), noise[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
-            axs[i].plot(list(range(1000)), anti[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
+        for community in communities_to_subset:
+            axs[i].plot(list(range(runtime)), misinfo[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
+            axs[i].plot(list(range(runtime)), noise[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
+            axs[i].plot(list(range(runtime)), anti[misinfo['Community']==community].iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
             axs[i].set_xlabel('Time')
             axs[i].set_ylabel('# of Reads')
-            axs[i].set_title('Information Read over Time by Community {}'.format(community))
+            if specific_topic:
+                axs[i].set_title('Topic {} Information Read over Time by Community {}'.format(specific_topic, community))
+            else:
+                axs[i].set_title('Information Read over Time by Community {}'.format(community))
             axs[i].legend()
             i+=1
+            output = '../community_' + str(community) + '_topic_' + str(specific_topic) + '.png'
+            plt.savefig(output, dpi = my_dpi)
     else:
         plt.clf()
-        plt.plot(list(range(1000)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
-        plt.plot(list(range(1000)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
-        plt.plot(list(range(1000)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
+        plt.figure(figsize=(1000/my_dpi, 800/my_dpi), dpi=my_dpi)
+        plt.plot(list(range(runtime)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
+        plt.plot(list(range(runtime)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
+        plt.plot(list(range(runtime)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
         plt.xlabel('Time')
         plt.ylabel('# of Reads')
         plt.title('Total Information Read over Time')
@@ -57,60 +72,9 @@ def plot_total_reads_over_time(by_community=False):
     del anti
     del noise
 
-def plot_claims_over_time(claims=None, topics=None, by_community=False):
-    '''
-    Have to provide claims or topics to plot
-    '''
-
-    if claims!=None and topics==None:
-        comm3 = pd.read_pickle('../output/claim_by_time_community3.pickle')
-        community3spread = comm3.loc[claims, :]
-        del comm3
-        comm56 = pd.read_pickle('../output/claim_by_time_community56.pickle')
-        community56spread = comm56.loc[claims, :]
-        del comm56
-        comm43 = pd.read_pickle('../output/claim_by_time_community56.pickle')
-        community43spread = comm43.loc[claims, :]
-        del comm43
-
-        if not(by_community):
-            plt.clf()
-            spread = community3spread + community43spread + community56spread
-            for claim in claims:
-                plt.plot(list(range(1000)), spread.loc[claim, :], label=claim)
-            
-            plt.legend()
-            plt.xlabel('Time')
-            plt.ylabel('# of Reads')
-            plt.title('Claims Read Over Time')
-            plt.show()
-        else: 
-            spread = [community3spread , community56spread , community43spread]
-            plt.clf()
-            fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharey=True)
-            i=0
-            comNames = [3, 56, 43]
-            for community in spread:
-                for claim in claims:
-                    axs[i].plot(list(range(1000)), community.loc[claim, :], label=claim)
-                    axs[i].set_xlabel('Time')
-                    axs[i].set_ylabel('# of Reads')
-                    axs[i].set_title('Claims Read Over Time by Community {}'.format(comNames[i]))
-                    axs[i].legend()
-                i+=1
-            plt.show()
-    
-    elif topics!=None and claims==None:
-        pass
-    else:
-        print('Gotta provide either topics or claims try again friend')
 
 
-
-#Some example things we can do, should come up with more interesting stuff to plot
-#Should also consider a better way to work with the claim by time data which are 3 yuge files
-
-plot_total_reads_over_time(by_community=False)
-plot_total_reads_over_time(by_community=True)
-plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=False)
-plot_claims_over_time(claims = ['1-53-93-0', '1-38-428-0'], by_community=True)
+plot_total_reads_over_time(by_community=True, specific_topic='0')
+plot_total_reads_over_time(by_community=True, specific_topic='1')
+plot_total_reads_over_time(by_community=True, specific_topic='2')
+plot_total_reads_over_time(by_community=True, specific_topic='3')
