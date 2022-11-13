@@ -132,10 +132,11 @@ def calculate_sentiment_rankings(G: nx.DiGraph, topics: list):
 
     for topic in topics:
         node_sentiments = [all_node_sentiments[key][topic] for key in all_node_sentiments.keys()]
-        deviations = [np.absolute(i - 0.5) for i in node_sentiments]
+        median = np.median(node_sentiments)
+        deviations = [np.absolute(i - median) for i in node_sentiments]
         rankings['sentiment' + str(topic)] = node_sentiments
         rankings['deviation' + str(topic)] = deviations
-        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < 0.5,
+        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < median,
                                                  -1*rankings['deviation' + str(topic)].rank(method='max')/len(rankings),
                                                  rankings['deviation' + str(topic)].rank(method='max')/len(rankings))
 
@@ -226,8 +227,9 @@ def retweet_behavior(topic, value, topic_sentiment, creator_prestige, misinfo_mu
 
 def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, num_read, learning_rate):
     # iterative mean updating of beliefs
-    new_sentiment = ((num_read - 1)/num_read)*current_sentiment + (1/num_read)*tweet_value*tweet_impactedness*learning_rate
-    return new_sentiment
+    new_sentiment = ((num_read - 1)/num_read)*current_sentiment + (1/num_read)*tweet_value*(1+tweet_impactedness)
+    difference = learning_rate*(new_sentiment - current_sentiment)
+    return current_sentiment + difference
 
 
 
@@ -241,13 +243,13 @@ outpath_node_time_info = '../output/node_time_info.pickle'
 subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
-learning_rate = 0.000000001
+learning_rate = 0.2
 NUM_CLAIMS = 100 #this is number of claims per topic per timestep
 runtime = 500
-perc_nodes_to_subset = 0.1
+perc_nodes_to_subset = 0.25
 perc_bots = 0.1
 load_data = False
-update_beliefs = False
+update_beliefs = True
 '''
 First topic (row) impacts every group the same, the other topics each impact
 one group significantly more than the others
@@ -376,7 +378,7 @@ def run(G, runtime):
                             '''
                             update beliefs for each topic
                             '''
-                            if update_beliefs:
+                            if update_beliefs and data['kind'] != 'bot':
                                 data['num_read'][topic] += 1
                                 data['sentiment'][topic] = update_topic_sentiment(current_sentiment=data['sentiment'][topic],
                                                                                   tweet_value = value,
