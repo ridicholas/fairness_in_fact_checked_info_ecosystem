@@ -50,15 +50,15 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
     :param perc_nodes_to_use: percentage of nodes from G you want to keep for simulation
     :param numTopics: number of topics in use this simulation round
     :perc_bots: what percentage of nodes will be bots
-    :param impactednesses:  len(numTopics) list of dictionaries. impactednesses[i] contains dictionary where keys are communities and values are the community's 
+    :param impactednesses:  len(numTopics) list of dictionaries. impactednesses[i] contains dictionary where keys are communities and values are the community's
                             impactedness value towards topic i.
                             (this value will be used as mean for drawing distribution)
-    :param sentiments: len(numTopics) list of dictionaries. sentiments[i] contains dictionary where keys are communities and values are the community's 
+    :param sentiments: len(numTopics) list of dictionaries. sentiments[i] contains dictionary where keys are communities and values are the community's
                             sentiment value towards topic i.
                             (this value will be used as mean for drawing distribution)
     :return: returns new network where nodes have impactedness, sentiments, and are bots
 
-    
+
     '''
 
     to_remove = random.sample(list(G.nodes), int(len(G.nodes)*(1-perc_nodes_to_use)))
@@ -73,7 +73,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
 
         #set things that matter if you are bot or not
         if node in bot_names:
-            data['lambda'] = np.random.uniform(0.1,0.75)
+            data['lambda'] = np.random.uniform(0.5,0.75)
             data['wake'] = 0 + np.round(np.random.exponential(scale = 1 / data['lambda']))
             data['inbox'] = []
             data['kind'] = 'bot'
@@ -94,11 +94,11 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
             data['impactedness'][topic] = np.max([0, np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
             data['sentiment'][topic] = np.max([0, np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
             data['num_read'][topic] = np.random.normal(impactednesses[topic][data['Community']]*100, scale = 10)
-        
+
         data['belief'] = np.array(list(data['sentiment'].values())).mean() #make belief an average of sentiments? then what we are interested in are changes in belief due to misinfo?
 
 
-        
+
         if data['kind'] != 'bot':
             if data['belief'] < 0.2: #this might need to be adjusted depending on how belief figures look
                 data['kind'] = 'beacon'
@@ -108,7 +108,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
     ## Remove self_loops and isololates
     G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
     G.remove_nodes_from(list(nx.isolates(G)))
-    
+
     return(G)
 
 
@@ -119,12 +119,12 @@ def calculate_sentiment_rankings(G: nx.DiGraph, topics: list):
     This function returns a pandas DataFrame with all nodes' percentile rankings of deviation from mean sentiment across all topics.
     This ranking is multiplied by -1 if they have a negative deviation and by +1 if they have a positive deviation,
     creating a range of possible values [-1,1].
-    
-    This pandas dataframe is used as an input to modify the distribution from which agents draw their quality of information when tweeting. 
-    A higher rank value in the dataframe results in a higher probability of creating misinformation. 
+
+    This pandas dataframe is used as an input to modify the distribution from which agents draw their quality of information when tweeting.
+    A higher rank value in the dataframe results in a higher probability of creating misinformation.
     This should be intuitive... if someone's sentiment is already high, they are
     more likely to create misinformation. If someone's sentiment is low, they are more likely to produce anti-misinformation.
-    
+
     One potential issue here is if sentiment is tightly clustered for all agents, this will sort of artificially make some agents produce more/less misinformation in that case.
     '''
     all_node_sentiments = nx.get_node_attributes(G, 'sentiment')
@@ -132,13 +132,14 @@ def calculate_sentiment_rankings(G: nx.DiGraph, topics: list):
 
     for topic in topics:
         node_sentiments = [all_node_sentiments[key][topic] for key in all_node_sentiments.keys()]
-        deviations = [np.absolute(i - 0.5) for i in node_sentiments]
+        median = np.median(node_sentiments)
+        deviations = [np.absolute(i - median) for i in node_sentiments]
         rankings['sentiment' + str(topic)] = node_sentiments
         rankings['deviation' + str(topic)] = deviations
-        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < 0.5,
+        rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < median,
                                                  -1*rankings['deviation' + str(topic)].rank(method='max')/len(rankings),
                                                  rankings['deviation' + str(topic)].rank(method='max')/len(rankings))
-        
+
     return rankings
 
 
@@ -149,33 +150,33 @@ def choose_topic(data: dict):
     return topic
 
 def choose_info_quality(node: str, rankings: pd.DataFrame, topic: int, agent_type: str):
-    
+
     '''
     For each (non-bot) type, we draw from a beta distribution with beta(5 - a, 5 + a), and we shift the parameters according
-    to their percentile rankings of sentiment deviation from the mean, such that those with low sentiment 
+    to their percentile rankings of sentiment deviation from the mean, such that those with low sentiment
     produce more anti-misinformation, and those with high sentiment produce more misinformation, but noise is always the most common
     info type produced.
-    
-    Because B(a,b) is bounded by (0, 1), we can just use thirds as cut points to effectively give different 
+
+    Because B(a,b) is bounded by (0, 1), we can just use thirds as cut points to effectively give different
     probabilistic weight to information quality in {-1, 0, 1}.
-    
+
     Bots produce misinformation 80% of the time
     '''
     if agent_type != 'bot':
         deviation_rank = rankings.loc[node].loc['rank' + str(topic)]
         raw = beta.rvs(5 + deviation_rank, 5 - deviation_rank, size=1)
         value = np.where(raw < 0.3333, -1, np.where(raw >= 0.3333 and raw < 0.666, 0, 1))[0]
-    else: 
+    else:
         value = np.where(np.random.uniform(size=1) > 0.2, 1, 0)[0]
     return value
 
 
 def choose_claim(value: int, num_claims: int):
     '''
-    Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair 
+    Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair
     is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
     so that we don't have agents posting {-1,0,1} all relative to the same claim.'
-    
+
     Parameters
     ----------
     value : quality of informaiton {-1, 0, 1} if anti-misinformation, noise, misinformation
@@ -184,7 +185,7 @@ def choose_claim(value: int, num_claims: int):
     claim number : (0-33) if anti-misinfo, (34-66) if noise, (66-100) if misinfo.
 
     '''
-    
+
     if value == -1:
         claim = random.sample(list(range(0,int(num_claims/3))), k=1)[0]
     elif value == 0:
@@ -214,21 +215,22 @@ def subset_graph(G, communities=None):
 
     return G2
 
-def retweet_behavior(topic, value, topic_sentiment, creator_prestige):
+def retweet_behavior(topic, value, topic_sentiment, creator_prestige, misinfo_multiplier):
     if value == -1:
         retweet_perc = (1 - topic_sentiment)*creator_prestige
     elif value == 0:
         retweet_perc = (0.5)*creator_prestige
-    elif value == 1:
-        retweet_perc = topic_sentiment*creator_prestige
+    elif value == 1: # misinfo is retweeted 70% more than real news
+        retweet_perc = np.min([1, topic_sentiment*creator_prestige*misinfo_multiplier])
     return retweet_perc
 
 
-def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, num_read):
+def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, num_read, learning_rate):
     # iterative mean updating of beliefs
-    new_sentiment = ((num_read - 1)/(num_read))*current_sentiment + (1/num_read)*tweet_value*tweet_impactedness
-    return new_sentiment
-    
+    new_sentiment = ((num_read - 1)/num_read)*current_sentiment + (1/num_read)*tweet_value*(1+tweet_impactedness)
+    difference = learning_rate*(new_sentiment - current_sentiment)
+    return current_sentiment + difference
+
 
 
 print('running....')
@@ -241,45 +243,49 @@ outpath_node_time_info = '../output/node_time_info.pickle'
 subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
+learning_rate = 0.2
 NUM_CLAIMS = 100 #this is number of claims per topic per timestep
-
-
+runtime = 500
+perc_nodes_to_subset = 0.25
+perc_bots = 0.1
+load_data = False
+update_beliefs = True
 '''
-First topic (row) impacts every group the same, the other topics each impact 
+First topic (row) impacts every group the same, the other topics each impact
 one group significantly more than the others
 '''
 
 
 impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},
-                  {3: 0.8, 56: 0.1, 43: 0.1},
-                  {3: 0.1, 56: 0.8, 43: 0.1},
-                  {3: 0.1, 56: 0.1, 43: 0.8}]
+                  {3: 0.8, 56: 0.3, 43: 0.3},
+                  {3: 0.3, 56: 0.8, 43: 0.3},
+                  {3: 0.3, 56: 0.3, 43: 0.8}]
 
 '''
-For the first topic (which everyone cares about equally), belief is roughly average (50%). 
-For the other topics, if a community is more impacted by a topic, we assume that their 
-average belief is lower, indicating that they have more knowledge of the truth than the 
+For the first topic (which everyone cares about equally), belief is roughly average (50%).
+For the other topics, if a community is more impacted by a topic, we assume that their
+average belief is lower, indicating that they have more knowledge of the truth than the
 other communities that are not impacted  by the topic.
 '''
-sentiments = [{3: 0.5, 56: 0.5, 43: 0.5}, 
-              {3: 0.2, 56: 0.8, 43: 0.8}, 
-              {3: 0.8, 56: 0.2, 43: 0.8},
-              {3: 0.8, 56: 0.8, 43: 0.2}]
+sentiments = [{3: 0.5, 56: 0.5, 43: 0.5},
+              {3: 0.3, 56: 0.8, 43: 0.8},
+              {3: 0.8, 56: 0.3, 43: 0.8},
+              {3: 0.8, 56: 0.8, 43: 0.3}]
 
 
-if os.path.isfile(subset_graph_file):
-        print('found simulation network file, loading from file')
+if load_data:
+        print('Loading from file')
         with open(subset_graph_file, "rb") as f:
             sampleG = pickle.load(f)
 else:
     print('simulation net file not found, creating it now')
     G = nx.read_gpickle(path)
     subG = subset_graph(G, communities=communities_to_subset)
-    sampleG = create_simulation_network(G=subG, 
-                              perc_nodes_to_use = 0.1,
-                              numTopics = num_topics, 
-                              perc_bots = 0.05, 
-                              impactednesses = impactednesses, 
+    sampleG = create_simulation_network(G=subG,
+                              perc_nodes_to_use = perc_nodes_to_subset,
+                              numTopics = num_topics,
+                              perc_bots = perc_bots,
+                              impactednesses = impactednesses,
                               sentiments = sentiments)
     del G
     del subG
@@ -292,14 +298,9 @@ def run(G, runtime):
     '''
     This executes a single run of the twitter_sim ABM model
     '''
-    ##################################
-    global_perception = 0.00000001
-    num_topics = 4
-
-    # Create scale free network
 
     '''
-    Prestige is degree - this makes nodes more likely to retweet info that comes from high degree users
+    Create data structures to capture simulation output
     '''
     prestige_values = percentile(list(dict(G.degree()).values()))
     nodes = list(G.nodes())
@@ -309,9 +310,8 @@ def run(G, runtime):
     # This will capture the unique-ids of each tweet read by each node.
     node_read_tweets = {node:[] for node in G.nodes()}
     community_sentiment_through_time = {com:{t:{topic: [] for topic in range(num_topics)} for t in range(runtime)} for com in communities_to_subset}
-    node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}    
+    node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
-    rankings = calculate_sentiment_rankings(G = G, topics = topics)
 
 
     bar = progressbar.ProgressBar()
@@ -320,6 +320,7 @@ def run(G, runtime):
         '''
         Users and Information interact
         '''
+        rankings = calculate_sentiment_rankings(G = G, topics = topics)
         for node, data in G.nodes(data=True):
             # Check if User logs on for this Time Step
            # print(node + '\n\n\n')
@@ -329,17 +330,17 @@ def run(G, runtime):
 
                 data['wake'] = data['wake'] + \
                     np.round(1 + np.random.exponential(scale=1 / data['lambda']))
-                
+
                 '''
                 Tweeting Behavior
                 '''
-                
+
                 if data['kind'] == 'bot':
                     chance = 1 # bots tweet every time they are awake
                 elif data['kind'] != 'bot':
                     # humans tweet proportionally to their degree
                     chance = prestige[node]
-                    
+
                 new_tweets = []
                 if chance > np.random.uniform():
                     #print('Here we go!\n\n\n Node ' + str(node) + '\n\n\n')
@@ -353,13 +354,13 @@ def run(G, runtime):
                         new_tweets.append(unique_id)
                 #else:
                     #print('No Go \n\n\n Node ' + str(node) + '\n\n\n')
-                               
-                   
+
+
                 '''
-                    
+
                 Read tweets, update beliefs, and re-tweet
-                    
-                '''               
+
+                '''
 
                 retweets = []
                 if len(data['inbox']) > 0:
@@ -377,28 +378,35 @@ def run(G, runtime):
                             '''
                             update beliefs for each topic
                             '''
-                            data['num_read'][topic] += 1
-                            data['sentiment'][topic] = update_topic_sentiment(current_sentiment=data['sentiment'][topic], 
-                                                                              tweet_value = value, 
-                                                                              tweet_impactedness=data['impactedness'][topic], 
-                                                                              num_read = data['num_read'][topic])
+                            if update_beliefs and data['kind'] != 'bot':
+                                data['num_read'][topic] += 1
+                                data['sentiment'][topic] = update_topic_sentiment(current_sentiment=data['sentiment'][topic],
+                                                                                  tweet_value = value,
+                                                                                  tweet_impactedness=data['impactedness'][topic],
+                                                                                  num_read = data['num_read'][topic],
+                                                                                  learning_rate = learning_rate)
                             '''
                             retweet behavior
                             '''
-                            perc = retweet_behavior(topic = topic, value=value, topic_sentiment=topic_sentiment,creator_prestige=creator_prestige)
+                            perc = retweet_behavior(topic = topic,
+                                                    value=value,
+                                                    topic_sentiment=topic_sentiment,
+                                                    creator_prestige=creator_prestige,
+                                                    misinfo_multiplier=1.7)
+
                             retweet_perc.append(perc)
-                            new_retweets.append(read_tweet) 
+                            new_retweets.append(read_tweet)
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
                             node_read_tweets_by_time[node][step].append(read_tweet)
-                            
+
                     for i in range(len(new_retweets)):
                         if retweet_perc[i] > np.random.uniform():
                             retweets.append(new_retweets[i])
                     # clear inbox
                     data['inbox'] = []
-                
-                
+
+
 
                 '''
                 Pass information on to followers
@@ -408,7 +416,7 @@ def run(G, runtime):
                     predecessors = G.predecessors(node)
                     for follower in predecessors:
                         G.nodes[follower]['inbox'].extend(new_tweets)
-                        
+
                 '''
                 Capture sentiment across topics for node
                 '''
@@ -423,12 +431,12 @@ def run(G, runtime):
 
 
 
-all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time = run(G = sampleG, runtime = 1000)
+all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time = run(G = sampleG, runtime = runtime)
 
 
 with open(outpath_info, 'wb') as file:
     pickle.dump(all_info, file, protocol=pickle.HIGHEST_PROTOCOL)
-    
+
 with open(outpath_node_info, 'wb') as file:
     pickle.dump(node_read_tweets, file, protocol=pickle.HIGHEST_PROTOCOL)
 
