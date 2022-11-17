@@ -11,12 +11,8 @@ import networkx as nx
 import random
 import numpy as np
 from numpy.random import choice
-from sklearn.metrics import pairwise_distances
 import progressbar
-import argparse
-import operator
 import os
-import time
 from scipy.stats import beta, rankdata
 import pickle
 # making sure wd is file directory so hardcoded paths work
@@ -191,32 +187,33 @@ def create_claims(num_claims):
     claims = pd.DataFrame(data=[i for i in range(num_claims)], columns = ['claim_id'])
     claims['type'] = claims['claim_id'].apply(type_func)
     claims['virality'] = claims['type'].apply(virality_func) 
-    return claims
+    
+    c = claims.set_index('claim_id')
+    c_dict = c.to_dict('index')
+    return c_dict
     
     
     
 
-def choose_claim(value: int, claims: pd.DataFrame):
+def choose_claim(value: int, num_claims: int):
     '''
     Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair
     is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
     so that we don't have agents posting {-1,0,1} all relative to the same claim.'
-
     Parameters
     ----------
     value : quality of informaiton {-1, 0, 1} if anti-misinformation, noise, misinformation
     Returns
     -------
     claim number : (0-33) if anti-misinfo, (34-66) if noise, (66-100) if misinfo.
-
     '''
 
     if value == -1:
-        claim = claims[claims['type']=='anti-misinfo'].sample(n=1)['claim_id'].to_numpy()[0]
+        claim = random.sample(list(range(0,int(num_claims/3))), k=1)[0]
     elif value == 0:
-        claim = claims[claims['type']=='noise'].sample(n=1)['claim_id'].to_numpy()[0]
+        claim = random.sample(list(range(int(num_claims/3),int(num_claims/3)*2)), k=1)[0]
     elif value == 1:
-        claim = claims[claims['type']=='misinfo'].sample(n=1)['claim_id'].to_numpy()[0]
+        claim = random.sample(list(range(int(num_claims/3)*2,num_claims)), k=1)[0]
     return claim
 
 def subset_graph(G, communities=None):
@@ -269,7 +266,7 @@ subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
 learning_rate = 0.2
-NUM_CLAIMS = 3000 #this is number of claims per topic per timestep
+NUM_CLAIMS = 6000 #this is number of claims per topic per timestep
 runtime = 500
 perc_nodes_to_subset = 0.2
 perc_bots = 0.1
@@ -374,7 +371,7 @@ def run(G, runtime):
                     for i in range(num_tweets):
                         topic = choose_topic(data = data)
                         value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
-                        claim = choose_claim(value = value, claims=all_claims)
+                        claim = choose_claim(value = value, num_claims=NUM_CLAIMS)
                         unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
@@ -396,7 +393,7 @@ def run(G, runtime):
                             topic = all_info[read_tweet]['topic']
                             value = all_info[read_tweet]['value']
                             read_claim = all_info[read_tweet]['claim']
-                            virality = all_claims['virality'][all_claims['claim_id'] == read_claim].to_numpy()[0]
+                            virality = all_claims[read_claim]['virality']
                             topic_sentiment = data['sentiment'][topic]
                             creator_prestige = prestige[all_info[read_tweet]['node-origin']]
 
