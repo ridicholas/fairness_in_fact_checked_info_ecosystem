@@ -176,7 +176,8 @@ def make_community_sentiment_plot(inpath):
                 aes(x='Time',y='Mean Sentiment', color = 'Topic'))
          + geom_line()
          + facet_wrap('Community')
-         + ggtitle('Mean Sentiment for Communties by Topic'))
+         + ggtitle('Mean Belief for Communties by Topic')
+         + ylab('Mean Belief'))
 
     plt.save(filename='../output/mean_sentiment_by_community.png', width = 10, height = 7)
 
