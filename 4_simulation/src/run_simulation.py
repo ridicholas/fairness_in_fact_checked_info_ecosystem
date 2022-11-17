@@ -271,7 +271,7 @@ communities_to_subset = [3,56,43]
 learning_rate = 0.2
 NUM_CLAIMS = 3000 #this is number of claims per topic per timestep
 runtime = 500
-perc_nodes_to_subset = 0.25
+perc_nodes_to_subset = 0.2
 perc_bots = 0.1
 load_data = False
 update_beliefs = True
@@ -358,7 +358,7 @@ def run(G, runtime):
                     np.round(1 + np.random.exponential(scale=1 / data['lambda']))
 
                 '''
-                Tweeting Behavior
+                Create tweets
                 '''
 
                 if data['kind'] == 'bot':
@@ -378,10 +378,7 @@ def run(G, runtime):
                         unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
-                #else:
-                    #print('No Go \n\n\n Node ' + str(node) + '\n\n\n')
-
-
+                
                 '''
 
                 Read tweets, update beliefs, and re-tweet
