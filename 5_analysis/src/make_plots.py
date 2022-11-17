@@ -6,6 +6,7 @@ import pickle
 import os
 import progressbar
 import fastparquet
+
 from plotnine import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +17,6 @@ inpath_community_sentiment = '../output/community_sentiment_clean.csv'
 
 '''
 def plot_total_reads_over_time(by_community=False, specific_topic=None):
-
     if specific_topic != None:
         misinfo = pd.read_pickle('../output/topic{}_node_by_time_misinfo.pickle'.format(specific_topic))
         anti = pd.read_pickle('../output/topic{}_node_by_time_anti.pickle'.format(specific_topic))
@@ -26,10 +26,12 @@ def plot_total_reads_over_time(by_community=False, specific_topic=None):
         anti = pd.read_pickle('../output/node_by_time_anti.pickle')
         noise = pd.read_pickle('../output/node_by_time_noise.pickle')
 
+
     plt.figure(figsize=(1000/my_dpi, 800/my_dpi), dpi=my_dpi)
     plt.plot(list(range(runtime)), misinfo.iloc[:, 1:].sum(axis=0), label = 'misinfo', color='red')
     plt.plot(list(range(runtime)), noise.iloc[:, 1:].sum(axis=0), label = 'noise', color='gray')
     plt.plot(list(range(runtime)), anti.iloc[:, 1:].sum(axis=0), label = 'anti', color='blue')
+
     plt.xlabel('Time')
     plt.ylabel('# of Reads')
     if specific_topic:
@@ -41,6 +43,7 @@ def plot_total_reads_over_time(by_community=False, specific_topic=None):
     plt.savefig('../output/total_topic_{}.png'.format(specific_topic))
 
     if by_community:
+        #communities = [3, 56, 43]
         plt.clf()
         plt.figure(figsize=(8000/my_dpi, 800/my_dpi), dpi=my_dpi)
         fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharey=True)
@@ -76,7 +79,6 @@ def plot_total_reads_over_time(by_community=False, specific_topic=None):
     del noise
 '''
 
-
 def plot_total_reads_over_time(by_community=False,specific_topic=None):
     
     colors = {'anti-misinfo':'blue', 'noise':'black', 'misinfo':'darkred'}  
@@ -104,6 +106,7 @@ def plot_total_reads_over_time(by_community=False,specific_topic=None):
     
     if specific_topic:
         title = 'Total Topic {} Information Read over Time'.format(specific_topic)
+
     else:
         title = 'Total Information Read over Time'
 
@@ -150,6 +153,11 @@ def plot_total_reads_over_time(by_community=False,specific_topic=None):
 
 
 
+plot_total_reads_over_time(by_community=True, specific_topic='0')
+plot_total_reads_over_time(by_community=True, specific_topic='1')
+plot_total_reads_over_time(by_community=True, specific_topic='2')
+plot_total_reads_over_time(by_community=True, specific_topic='3')
+#plot_total_reads_over_time(by_community=True)
 
 
 plot_total_reads_over_time(by_community=True, specific_topic='0')

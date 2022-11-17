@@ -65,8 +65,6 @@ def make_node_by_time_frame(G, all_info, node_read_tweets_by_time, steps, topic_
                         misinfo_frame.loc[node, step] += 1
 
 
-
-
     return anti_frame, noise_frame, misinfo_frame
 
 def make_claim_by_time_frame(G, all_info, node_read_tweets_by_time, steps, community):
@@ -111,12 +109,12 @@ def process_community_sentiment(community_sentiment):
     result = result.sort_values(by=['Community','Topic','Time'])
     return result
 
+
 def mean_value_of_info_produced(all_info):
 
     raw = pd.DataFrame.from_dict(all_info, orient='index')
     result = raw.groupby(['time-origin','topic']).agg(mean_value=pd.NamedAgg(column='value',aggfunc='mean')).sort_values(by=['topic','time-origin'])
     return result
-
 
 
 
