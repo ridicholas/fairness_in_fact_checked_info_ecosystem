@@ -11,12 +11,8 @@ import networkx as nx
 import random
 import numpy as np
 from numpy.random import choice
-from sklearn.metrics import pairwise_distances
 import progressbar
-import argparse
-import operator
 import os
-import time
 from scipy.stats import beta, rankdata
 import pickle
 # making sure wd is file directory so hardcoded paths work
@@ -93,7 +89,7 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
         for topic in range(numTopics):
             data['impactedness'][topic] = np.max([0, np.random.normal(loc=impactednesses[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
             data['sentiment'][topic] = np.max([0, np.random.normal(loc=sentiments[topic][data['Community']], scale=0.1)]) #making it a gaussian for now
-            data['num_read'][topic] = np.random.normal(impactednesses[topic][data['Community']]*100, scale = 10)
+            data['num_read'][topic] = np.max([0, np.random.normal(impactednesses[topic][data['Community']]*100, scale = 10)])
 
         data['belief'] = np.array(list(data['sentiment'].values())).mean() #make belief an average of sentiments? then what we are interested in are changes in belief due to misinfo?
 
@@ -170,20 +166,46 @@ def choose_info_quality(node: str, rankings: pd.DataFrame, topic: int, agent_typ
         value = np.where(np.random.uniform(size=1) > 0.2, 1, 0)[0]
     return value
 
+def create_claims(num_claims):
+
+    def type_func(x):
+        if x < int(num_claims/3):
+            return 'anti-misinfo'
+        elif x >= int(num_claims/3) and x < int((2*num_claims)/3):
+            return 'noise'
+        else:
+            return 'misinfo'    
+    
+    def virality_func(x):
+        if x == 'anti-misinfo':
+            return 1 + np.random.beta(a=3, b=7, size=1)[0]
+        elif x == 'noise':
+            return 1 + np.random.beta(a=1, b=9, size=1)[0]
+        else:
+            return 1 + np.random.beta(a=6,b=4,size=1)[0]
+        
+    claims = pd.DataFrame(data=[i for i in range(num_claims)], columns = ['claim_id'])
+    claims['type'] = claims['claim_id'].apply(type_func)
+    claims['virality'] = claims['type'].apply(virality_func) 
+    
+    c = claims.set_index('claim_id')
+    c_dict = c.to_dict('index')
+    return c_dict
+    
+    
+    
 
 def choose_claim(value: int, num_claims: int):
     '''
     Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair
     is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
     so that we don't have agents posting {-1,0,1} all relative to the same claim.'
-
     Parameters
     ----------
     value : quality of informaiton {-1, 0, 1} if anti-misinformation, noise, misinformation
     Returns
     -------
     claim number : (0-33) if anti-misinfo, (34-66) if noise, (66-100) if misinfo.
-
     '''
 
     if value == -1:
@@ -215,13 +237,13 @@ def subset_graph(G, communities=None):
 
     return G2
 
-def retweet_behavior(topic, value, topic_sentiment, creator_prestige, misinfo_multiplier):
+def retweet_behavior(topic, value, topic_sentiment, creator_prestige, claim_virality):
     if value == -1:
-        retweet_perc = (1 - topic_sentiment)*creator_prestige
+        retweet_perc = np.min([1, (1 - topic_sentiment)*creator_prestige*claim_virality])
     elif value == 0:
-        retweet_perc = (0.5)*creator_prestige
+        retweet_perc = np.min([1, (0.5)*creator_prestige*claim_virality])
     elif value == 1: # misinfo is retweeted 70% more than real news
-        retweet_perc = np.min([1, topic_sentiment*creator_prestige*misinfo_multiplier])
+        retweet_perc = np.min([1, topic_sentiment*creator_prestige*claim_virality])
     return retweet_perc
 
 
@@ -244,9 +266,9 @@ subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
 learning_rate = 0.2
-NUM_CLAIMS = 100 #this is number of claims per topic per timestep
+NUM_CLAIMS = 6000 #this is number of claims per topic per timestep
 runtime = 500
-perc_nodes_to_subset = 0.25
+perc_nodes_to_subset = 0.2
 perc_bots = 0.1
 load_data = False
 update_beliefs = True
@@ -312,6 +334,7 @@ def run(G, runtime):
     community_sentiment_through_time = {com:{t:{topic: [] for topic in range(num_topics)} for t in range(runtime)} for com in communities_to_subset}
     node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
+    all_claims = create_claims(num_claims = NUM_CLAIMS)
 
 
     bar = progressbar.ProgressBar()
@@ -332,7 +355,7 @@ def run(G, runtime):
                     np.round(1 + np.random.exponential(scale=1 / data['lambda']))
 
                 '''
-                Tweeting Behavior
+                Create tweets
                 '''
 
                 if data['kind'] == 'bot':
@@ -352,10 +375,7 @@ def run(G, runtime):
                         unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
-                #else:
-                    #print('No Go \n\n\n Node ' + str(node) + '\n\n\n')
-
-
+                
                 '''
 
                 Read tweets, update beliefs, and re-tweet
@@ -372,6 +392,8 @@ def run(G, runtime):
                         if read_tweet not in node_read_tweets[node]:
                             topic = all_info[read_tweet]['topic']
                             value = all_info[read_tweet]['value']
+                            read_claim = all_info[read_tweet]['claim']
+                            virality = all_claims[read_claim]['virality']
                             topic_sentiment = data['sentiment'][topic]
                             creator_prestige = prestige[all_info[read_tweet]['node-origin']]
 
@@ -392,7 +414,7 @@ def run(G, runtime):
                                                     value=value,
                                                     topic_sentiment=topic_sentiment,
                                                     creator_prestige=creator_prestige,
-                                                    misinfo_multiplier=1.7)
+                                                    claim_virality=virality)
 
                             retweet_perc.append(perc)
                             new_retweets.append(read_tweet)
