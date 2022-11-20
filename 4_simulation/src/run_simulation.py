@@ -18,7 +18,7 @@ import pickle
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# having trouble importing this from the other folder so just copied and pasted it here for now
+
 
 
 
@@ -104,6 +104,11 @@ def create_simulation_network(G: nx.digraph, perc_nodes_to_use: float, numTopics
     ## Remove self_loops and isololates
     G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
     G.remove_nodes_from(list(nx.isolates(G)))
+
+    bb = nx.betweenness_centrality(G)
+    degrees = dict(G.in_degree())
+    nx.set_node_attributes(G, bb, "centrality")
+    nx.set_node_attributes(G, degrees, "degree")
 
     return(G)
 
@@ -262,13 +267,16 @@ outpath_info = '../output/all_info.pickle'
 outpath_node_info = '../output/node_info.pickle'
 outpath_community_sentiment = '../output/community_sentiment.pickle'
 outpath_node_time_info = '../output/node_time_info.pickle'
+outpath_checkworthy = '../output/checkworthy_data.pickle'
 subset_graph_file = '../output/simulation_net.gpickle'
 num_topics = 4
 communities_to_subset = [3,56,43]
 learning_rate = 0.2
 NUM_CLAIMS = 6000 #this is number of claims per topic per timestep
 runtime = 500
-perc_nodes_to_subset = 0.2
+agg_interval = 3
+agg_steps = 3
+perc_nodes_to_subset = 0.1
 perc_bots = 0.1
 load_data = False
 update_beliefs = True
@@ -316,7 +324,7 @@ else:
 
 
 
-def run(G, runtime):
+def run(G, runtime, agg_interval=3, agg_steps=3):
     '''
     This executes a single run of the twitter_sim ABM model
     '''
@@ -324,7 +332,7 @@ def run(G, runtime):
     '''
     Create data structures to capture simulation output
     '''
-    prestige_values = percentile(list(dict(G.degree()).values()))
+    prestige_values = percentile(list(dict(G.in_degree()).values()))
     nodes = list(G.nodes())
     prestige = {nodes[i]: prestige_values[i] for i in range(len(nodes))}
     # Initialize objects to collect results
@@ -335,6 +343,9 @@ def run(G, runtime):
     node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
     all_claims = create_claims(num_claims = NUM_CLAIMS)
+    checkworthy_data = {}
+
+    
 
 
     bar = progressbar.ProgressBar()
@@ -373,9 +384,28 @@ def run(G, runtime):
                         value = choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
                         claim = choose_claim(value = value, num_claims=NUM_CLAIMS)
                         unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
+                        claim_id = str(topic) + '-' + str(claim)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
-                
+                        if claim_id not in checkworthy_data.keys():
+                            checkworthy_data.update({claim_id: {'topic':topic,
+                            'value':value,
+                            'claim':claim,
+                            'num_of_origins': 1, 
+                            'avg_degree_of_origins': data['degree'], 
+                            'max_degree_of_origins': data['degree'],
+                            'avg_centrality_of_origins': data['centrality'], 
+                            'max_centrality_of_origins': data['centrality']}})
+                        else:
+                            checkworthy_data[claim_id]['num_of_origins'] += 1
+                            if data['degree'] > checkworthy_data[claim_id]['max_degree_of_origins']:
+                                checkworthy_data[claim_id]['max_degree_of_origins'] = data['degree']
+                            if data['centrality'] > checkworthy_data[claim_id]['max_centrality_of_origins']:
+                                checkworthy_data[claim_id]['max_centrality_of_origins'] = data['centrality']
+                            checkworthy_data[claim_id]['avg_degree_of_origins'] += (data['degree'] - checkworthy_data[claim_id]['avg_degree_of_origins'])/checkworthy_data[claim_id]['num_of_origins']
+                            checkworthy_data[claim_id]['avg_centrality_of_origins'] += (data['centrality'] - checkworthy_data[claim_id]['avg_centrality_of_origins'])/checkworthy_data[claim_id]['num_of_origins']
+                            
+
                 '''
 
                 Read tweets, update beliefs, and re-tweet
@@ -421,6 +451,35 @@ def run(G, runtime):
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
                             node_read_tweets_by_time[node][step].append(read_tweet)
+                            #update checkworthy data figures
+                            time_feature = int((step - all_info[read_tweet]['time-origin'])/agg_interval)+1
+                            if time_feature <= agg_steps:
+                                origin_node = read_tweet.split('-')[2]
+                                claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
+                                if 'step{}_nodes_visited'.format(time_feature) not in checkworthy_data[claim_id].keys():
+                                    checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)] = 1
+                                    checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)] = data['degree']
+                                    checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)] = data['centrality']
+                                    checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)] = data['degree']
+                                    checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)] = data['centrality']
+                                    checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = 1
+                                else:
+                                    checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)] += 1
+                                    if data['degree'] > checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)]:
+                                        checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)] = data['degree']
+                                    if data['centrality'] > checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)]:
+                                        checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)] = data['centrality']
+
+                                    checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)] += (data['degree'] - checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)])/checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
+                                    checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)] += (data['centrality'] - checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)])/checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
+                                    
+                                    
+                                    distance = nx.shortest_path_length(G, node, origin_node) #worried this will take too long
+                                    if distance > checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)]:
+                                        checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = distance
+
+
+
 
                     for i in range(len(new_retweets)):
                         if retweet_perc[i] > np.random.uniform():
@@ -446,14 +505,14 @@ def run(G, runtime):
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time
+    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, checkworthy_data
 
 
 
 
 
 
-all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time = run(G = sampleG, runtime = runtime)
+all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, checkworthy_data = run(G = sampleG, runtime = runtime, agg_interval=agg_interval, agg_steps=agg_steps)
 
 
 with open(outpath_info, 'wb') as file:
@@ -467,3 +526,8 @@ with open(outpath_community_sentiment, 'wb') as file:
 
 with open(outpath_node_time_info, 'wb') as file:
     pickle.dump(node_read_tweets_by_time, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open(outpath_checkworthy, 'wb') as file:
+    pickle.dump(checkworthy_data, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+

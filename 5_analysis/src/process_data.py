@@ -13,11 +13,20 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 G = nx.read_gpickle("../../4_simulation/output/simulation_net.gpickle")
 
+
+
 inpath_info = '../../4_simulation/output/all_info.pickle'
 inpath_node_info = '../../4_simulation/output/node_info.pickle'
 inpath_node_time_info = '../../4_simulation/output/node_time_info.pickle'
 inpath_sentiment = '../../4_simulation/output/community_sentiment.pickle'
+inpath_checkworthy = '../../4_simulation/output/checkworthy_data.pickle'
+
 runtime = 500
+
+with open(inpath_checkworthy, 'rb') as file:
+    checkworthy_data = pd.DataFrame(pickle.load(file)).transpose()
+
+checkworthy_data.to_csv('../output/checkworthy_data.csv')
 
 with open(inpath_info, 'rb') as file:
     all_info = pickle.load(file)
