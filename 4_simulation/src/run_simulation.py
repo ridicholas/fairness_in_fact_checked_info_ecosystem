@@ -15,6 +15,7 @@ import progressbar
 import os
 from scipy.stats import beta, rankdata
 import pickle
+from checkworthy import *
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -260,6 +261,11 @@ def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, n
 
 
 
+
+
+
+
+
 print('running....')
 #path = '/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/data/nodes_with_community.gpickle'
 path = '../../data/nodes_with_community.gpickle'
@@ -278,8 +284,9 @@ agg_interval = 3
 agg_steps = 3
 perc_nodes_to_subset = 0.1
 perc_bots = 0.1
-load_data = False
+load_data = True
 update_beliefs = True
+depths = [2,4,6]
 '''
 First topic (row) impacts every group the same, the other topics each impact
 one group significantly more than the others
@@ -343,7 +350,7 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
     node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
     all_claims = create_claims(num_claims = NUM_CLAIMS)
-    checkworthy_data = {}
+    check = checkworthy(agg_interval=agg_interval, agg_steps = agg_steps, G = G, depths = depths)
 
     
 
@@ -387,23 +394,14 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                         claim_id = str(topic) + '-' + str(claim)
                         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
                         new_tweets.append(unique_id)
-                        if claim_id not in checkworthy_data.keys():
-                            checkworthy_data.update({claim_id: {'topic':topic,
-                            'value':value,
-                            'claim':claim,
-                            'num_of_origins': 1, 
-                            'avg_degree_of_origins': data['degree'], 
-                            'max_degree_of_origins': data['degree'],
-                            'avg_centrality_of_origins': data['centrality'], 
-                            'max_centrality_of_origins': data['centrality']}})
+                        '''
+                        update checkworthy data
+                        '''
+                        check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = claim)
+                        if claim_id not in check.checkworthy_data.keys():
+                            check.update_keys()
                         else:
-                            checkworthy_data[claim_id]['num_of_origins'] += 1
-                            if data['degree'] > checkworthy_data[claim_id]['max_degree_of_origins']:
-                                checkworthy_data[claim_id]['max_degree_of_origins'] = data['degree']
-                            if data['centrality'] > checkworthy_data[claim_id]['max_centrality_of_origins']:
-                                checkworthy_data[claim_id]['max_centrality_of_origins'] = data['centrality']
-                            checkworthy_data[claim_id]['avg_degree_of_origins'] += (data['degree'] - checkworthy_data[claim_id]['avg_degree_of_origins'])/checkworthy_data[claim_id]['num_of_origins']
-                            checkworthy_data[claim_id]['avg_centrality_of_origins'] += (data['centrality'] - checkworthy_data[claim_id]['avg_centrality_of_origins'])/checkworthy_data[claim_id]['num_of_origins']
+                            check.update_agg_values()
                             
 
                 '''
@@ -451,32 +449,13 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
                             node_read_tweets_by_time[node][step].append(read_tweet)
-                            #update checkworthy data figures
+                            # update checkworthy data figures
                             time_feature = int((step - all_info[read_tweet]['time-origin'])/agg_interval)+1
                             if time_feature <= agg_steps:
                                 origin_node = read_tweet.split('-')[2]
                                 claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
-                                if 'step{}_nodes_visited'.format(time_feature) not in checkworthy_data[claim_id].keys():
-                                    checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)] = 1
-                                    checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)] = data['degree']
-                                    checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)] = data['centrality']
-                                    checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)] = data['degree']
-                                    checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)] = data['centrality']
-                                    checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = 1
-                                else:
-                                    checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)] += 1
-                                    if data['degree'] > checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)]:
-                                        checkworthy_data[claim_id]['step{}_max_degree_visited'.format(time_feature)] = data['degree']
-                                    if data['centrality'] > checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)]:
-                                        checkworthy_data[claim_id]['step{}_max_centrality_visited'.format(time_feature)] = data['centrality']
-
-                                    checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)] += (data['degree'] - checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)])/checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
-                                    checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)] += (data['centrality'] - checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)])/checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
-                                    
-                                    
-                                    distance = nx.shortest_path_length(G, node, origin_node) #worried this will take too long
-                                    if distance > checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)]:
-                                        checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = distance
+                                check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
+                                check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
 
 
@@ -505,7 +484,7 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, checkworthy_data
+    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check.checkworthy_data
 
 
 
