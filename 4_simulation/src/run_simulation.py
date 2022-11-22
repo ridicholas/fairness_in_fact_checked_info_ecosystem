@@ -180,8 +180,8 @@ def create_claims(num_claims):
         elif x >= int(num_claims/3) and x < int((2*num_claims)/3):
             return 'noise'
         else:
-            return 'misinfo'    
-    
+            return 'misinfo'
+
     def virality_func(x):
         if x == 'anti-misinfo':
             return 1 + np.random.beta(a=3, b=7, size=1)[0]
@@ -189,17 +189,17 @@ def create_claims(num_claims):
             return 1 + np.random.beta(a=1, b=9, size=1)[0]
         else:
             return 1 + np.random.beta(a=6,b=4,size=1)[0]
-        
+
     claims = pd.DataFrame(data=[i for i in range(num_claims)], columns = ['claim_id'])
     claims['type'] = claims['claim_id'].apply(type_func)
-    claims['virality'] = claims['type'].apply(virality_func) 
-    
+    claims['virality'] = claims['type'].apply(virality_func)
+
     c = claims.set_index('claim_id')
     c_dict = c.to_dict('index')
     return c_dict
-    
-    
-    
+
+
+
 
 def choose_claim(value: int, num_claims: int):
     '''
@@ -287,6 +287,8 @@ perc_bots = 0.1
 load_data = True
 update_beliefs = True
 depths = [2,4,6]
+outcome_time = 48
+
 '''
 First topic (row) impacts every group the same, the other topics each impact
 one group significantly more than the others
@@ -331,7 +333,7 @@ else:
 
 
 
-def run(G, runtime, agg_interval=3, agg_steps=3):
+def run(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, impactednesses = impactednesses):
     '''
     This executes a single run of the twitter_sim ABM model
     '''
@@ -350,9 +352,14 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
     node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
     all_claims = create_claims(num_claims = NUM_CLAIMS)
-    check = checkworthy(agg_interval=agg_interval, agg_steps = agg_steps, G = G, depths = depths)
+    check = checkworthy(agg_interval=agg_interval,
+                        agg_steps = agg_steps,
+                        G = G,
+                        depths = depths,
+                        outcome_time=outcome_time,
+                        impactednesses=impactednesses)
 
-    
+
 
 
     bar = progressbar.ProgressBar()
@@ -402,7 +409,7 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                             check.update_keys()
                         else:
                             check.update_agg_values()
-                            
+
 
                 '''
 
@@ -449,13 +456,20 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
                             node_read_tweets_by_time[node][step].append(read_tweet)
-                            # update checkworthy data figures
+                            # update checkworthy data features
                             time_feature = int((step - all_info[read_tweet]['time-origin'])/agg_interval)+1
                             if time_feature <= agg_steps:
                                 origin_node = read_tweet.split('-')[2]
                                 claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
                                 check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
                                 check.update_time_values(time_feature=time_feature, origin_node=origin_node)
+                            # udpate checkworthy outcome label - average virality at t=48hrs
+                            time_from_launch = step - all_info[read_tweet]['time-origin']
+                            if time_from_launch <= outcome_time:
+                                claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
+                                check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
+                                check.update_virality_outcome(time_from_launch=time_from_launch)
+
 
 
 
@@ -484,14 +498,28 @@ def run(G, runtime, agg_interval=3, agg_steps=3):
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check.checkworthy_data
+    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check
 
 
 
+print('\n\n\n\n\n ----------- Running Simulation --------- \n\n\n\n\n')
+
+
+all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check = run(G = sampleG,
+                                                                                                    runtime = runtime,
+                                                                                                    agg_interval=agg_interval,
+                                                                                                    agg_steps=agg_steps,
+                                                                                                    outcome_time=outcome_time)
+
+
+print('\n\n\n\n\n ----------- Sampling Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+
+check.sample_labels_for_claims(sample_method = 'random')
+check.sample_labels_for_claims(sample_method = 'stratified')
+check.sample_labels_for_claims(sample_method = 'knowledgable_community')
 
 
 
-all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, checkworthy_data = run(G = sampleG, runtime = runtime, agg_interval=agg_interval, agg_steps=agg_steps)
 
 
 with open(outpath_info, 'wb') as file:
@@ -507,6 +535,4 @@ with open(outpath_node_time_info, 'wb') as file:
     pickle.dump(node_read_tweets_by_time, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 with open(outpath_checkworthy, 'wb') as file:
-    pickle.dump(checkworthy_data, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-
+    pickle.dump(check.checkworthy_data, file, protocol=pickle.HIGHEST_PROTOCOL)
