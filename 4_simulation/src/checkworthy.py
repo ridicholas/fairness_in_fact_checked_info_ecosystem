@@ -132,7 +132,7 @@ class checkworthy():
                 nodes_to_survey = communities.groupby('Community', group_keys=False).apply(lambda x: x.sample(int(labels_per_claim/3))).index.to_list()
             elif sample_method == 'knowledgable_community':
                 max_keys = [key for key, value in impactedness[topic].items() if value == max(impactedness[topic].values())]
-                nodes_to_survey = communities[communities['Community'].isin(max_keys)].apply(lambda x: x.sample(labels_per_claim)).index.to_list()
+                nodes_to_survey = communities[communities['Community'].isin(max_keys)].apply(lambda x: x.sample(labels_per_claim, replace = True)).index.to_list()
 
             survey_results = []
             for node in nodes_to_survey:
