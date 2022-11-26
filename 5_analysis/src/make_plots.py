@@ -12,7 +12,7 @@ from plotnine import *
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 communities_to_subset = [3, 56, 43]
-runtime = 500
+runtime = 600
 inpath_community_sentiment = '../output/community_sentiment_clean.csv'
 
 
