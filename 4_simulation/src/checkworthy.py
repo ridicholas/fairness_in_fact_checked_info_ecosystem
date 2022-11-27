@@ -5,6 +5,7 @@ Created on Mon Nov 21 13:26:27 2022
 
 @author: tdn897
 """
+import pandas as pd
 
 class checkworthy():
 
@@ -50,6 +51,7 @@ class checkworthy():
                                   'max_degree_of_origins': self.data['degree'],
                                   'avg_centrality_of_origins': self.data['centrality'],
                                   'max_centrality_of_origins': self.data['centrality']}})
+
 
     def update_agg_values(self):
         claim_id = self.claim_id
@@ -109,6 +111,40 @@ class checkworthy():
             self.checkworthy_data[claim_id]['outcome_nodes_at_t{}'.format(self.outcome_time)] += 1
 
 
+    def sample_claims(self, num_to_sample=2000, sample_method='random'):
+        import random
+
+        
+        checkworthy_data = pd.DataFrame(self.checkworthy_data).transpose().copy()
+        checkworthy_data['total_nodes_visited'] = checkworthy_data['num_of_origins']
+        visit_cols = checkworthy_data.columns.str.contains('nodes_visited')
+        for col in checkworthy_data.columns[visit_cols]:
+            checkworthy_data['total_nodes_visited'] += checkworthy_data[col]
+
+        numSamples = min(num_to_sample, checkworthy_data.shape[0])
+        if sample_method == 'random': #fully random sampling of claims
+            checkworthy_data = checkworthy_data.loc[random.sample(list(self.checkworthy_data.index), numSamples), :]
+        
+        if sample_method == 'top_num_origins': #probably not a great idea
+            checkworthy_data = checkworthy_data.sort_values(by='num_of_origins', ascending=False).iloc[0:numSamples, :]
+
+        if sample_method == 'top_max_origin_degree':
+            checkworthy_data = checkworthy_data.sort_values(by='max_degree_of_origins', ascending=False).iloc[0:numSamples, :]
+
+        if sample_method == 'top_avg_origin_degree':
+            checkworthy_data = checkworthy_data.sort_values(by='avg_degree_of_origins', ascending=False).iloc[0:numSamples, :]
+        
+        if sample_method == 'nodes_visited':
+            checkworthy_data = checkworthy_data.sort_values(by='total_nodes_visited', ascending=False).iloc[0:numSamples, :]
+
+
+        self.sampled_checkworthy_data = self.checkworthy_data.copy()
+        for key in list(self.checkworthy_data.keys()):
+            if key not in checkworthy_data.index:
+                self.sampled_checkworthy_data.pop(key)
+        
+        
+
     def sample_labels_for_claims(self, labels_per_claim = 6, sample_method = 'random'):
 
         import pandas as pd
@@ -121,7 +157,7 @@ class checkworthy():
         belief = self.get_node_attributes(G, 'sentiment')
         all_nodes = list(G.nodes())
 
-        for claim_id in self.checkworthy_data:
+        for claim_id in self.sampled_checkworthy_data:
 
             topic = self.checkworthy_data[claim_id]['topic']
             value = self.checkworthy_data[claim_id]['value']
@@ -147,4 +183,4 @@ class checkworthy():
 
 
             mean_survey = np.mean(survey_results)
-            self.checkworthy_data[claim_id]['average_truth_perception_{}'.format(sample_method)] = mean_survey
+            self.sampled_checkworthy_data[claim_id]['average_truth_perception_{}'.format(sample_method)] = mean_survey

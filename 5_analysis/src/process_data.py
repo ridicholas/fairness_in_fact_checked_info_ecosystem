@@ -6,6 +6,8 @@ import pickle
 import os
 import progressbar
 import pandas as pd
+import checkworthy
+
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -13,20 +15,27 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 G = nx.read_gpickle("../../4_simulation/output/simulation_net.gpickle")
 
+mitigation=True
+runtime=300 #runtime for a half
+
+if mitigation:
+    m = 'mitigation/'
+    runtime*=2
+else:
+    m=''
 
 
-inpath_info = '../../4_simulation/output/all_info.pickle'
-inpath_node_info = '../../4_simulation/output/node_info.pickle'
-inpath_node_time_info = '../../4_simulation/output/node_time_info.pickle'
-inpath_sentiment = '../../4_simulation/output/community_sentiment.pickle'
-inpath_checkworthy = '../../4_simulation/output/checkworthy_data.pickle'
+inpath_info = '../../4_simulation/output/{}all_info.pickle'.format(m)
+inpath_node_info = '../../4_simulation/output/{}node_info.pickle'.format(m)
+inpath_node_time_info = '../../4_simulation/output/{}node_time_info.pickle'.format(m)
+inpath_sentiment = '../../4_simulation/output/{}community_sentiment.pickle'.format(m)
+inpath_checkworthy = '../../4_simulation/output/{}checkworthy_data.pickle'.format(m)
 
-runtime = 500
 
 with open(inpath_checkworthy, 'rb') as file:
-    checkworthy_data = pd.DataFrame(pickle.load(file)).transpose()
+    check = pickle.load(file)
 
-checkworthy_data.to_csv('../output/checkworthy_data.csv')
+pd.DataFrame(check.checkworthy_data).transpose().to_csv('../output/checkworthy_data.csv')
 
 with open(inpath_info, 'rb') as file:
     all_info = pickle.load(file)
