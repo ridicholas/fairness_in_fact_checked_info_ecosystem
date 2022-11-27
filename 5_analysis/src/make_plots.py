@@ -6,108 +6,117 @@ import pickle
 import os
 import progressbar
 import fastparquet
-
 from plotnine import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-communities_to_subset = [3, 56, 43]
-runtime = 600
-inpath_community_sentiment = '../output/community_sentiment_clean.csv'
 
 
-def plot_total_reads_over_time(by_community=False,specific_topic=None):
+def plot_total_reads_over_time(midpoint, mitigation, file, by_community=False,specific_topic=None, smooth_interval = 25):
     
     colors = {'anti-misinfo':'blue', 'noise':'black', 'misinfo':'darkred'}  
 
+    misinfo_none = pd.read_pickle('../output/mitigation-none/node_by_time_misinfo.pickle')
+    anti_none = pd.read_pickle('../output/mitigation-none/node_by_time_anti.pickle')
+    noise_none = pd.read_pickle('../output/mitigation-none/node_by_time_noise.pickle')
+    misinfo_none['Mitigation'] = 'None'
+    anti_none['Mitigation'] = 'None'
+    noise_none['Mitigation'] = 'None'
     
-    if specific_topic != None:
-        misinfo = pd.read_pickle('../output/topic{}_node_by_time_misinfo.pickle'.format(specific_topic))
-        anti = pd.read_pickle('../output/topic{}_node_by_time_anti.pickle'.format(specific_topic))
-        noise = pd.read_pickle('../output/topic{}_node_by_time_noise.pickle'.format(specific_topic))
-    else:
-        misinfo = pd.read_pickle('../output/node_by_time_misinfo.pickle')
-        anti = pd.read_pickle('../output/node_by_time_anti.pickle')
-        noise = pd.read_pickle('../output/node_by_time_noise.pickle')
-        
-    time = list(range(runtime)) + list(range(runtime)) + list(range(runtime))
-    labels = ['misinfo' for i in range(runtime)] + ['anti-misinfo' for i in range(runtime)] + ['noise' for i in range(runtime)]
-    misinfo_reads = misinfo.iloc[:, 1:].sum(axis=0)
-    anti_misinfo_reads = anti.iloc[:, 1:].sum(axis=0)
-    noise_reads = noise.iloc[:, 1:].sum(axis=0)
-    plot_frame = pd.concat([misinfo_reads,anti_misinfo_reads,noise_reads]).to_frame()
-    plot_frame['time'] = time
-    plot_frame['label'] = labels
-    plot_frame = plot_frame.rename(columns={0:'reads'})
+    misinfo_mit = pd.read_pickle('../output/{}/node_by_time_misinfo.pickle'.format(file))
+    anti_mit = pd.read_pickle('../output/{}/node_by_time_anti.pickle'.format(file))
+    noise_mit = pd.read_pickle('../output/{}/node_by_time_noise.pickle'.format(file))
+    misinfo_mit['Mitigation'] = mitigation
+    anti_mit['Mitigation'] = mitigation
+    noise_mit['Mitigation'] = mitigation
     
+    combined = pd.concat([misinfo_none, anti_none, noise_none,misinfo_mit,anti_mit,noise_mit])
+    combined = combined.sort_values(by=['Community', 'Topic', 'Type', 'Mitigation', 'Step'])
+
     
     if specific_topic:
         title = 'Total Topic {} Information Read over Time'.format(specific_topic)
-
+        
     else:
         title = 'Total Information Read over Time'
 
+
+    topic_frame = combined[combined['Topic']==specific_topic]
     
-    plt=(ggplot(plot_frame,
-                aes(x='time',y='reads', color = 'label'))
+    topic_frame_total = topic_frame.groupby(['Topic', 'Type', 'Mitigation', 'Step']).agg({'Reads': 'sum'})
+    topic_frame_total['Reads (moving average)'] = topic_frame_total.groupby(['Type','Mitigation'])['Reads'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+    topic_frame_total = topic_frame_total.reset_index()
+    
+    plt=(ggplot(topic_frame_total,
+                aes(x='Step',y='Reads (moving average)', color = 'Type', linetype = 'Mitigation'))
          + geom_line()
          + ggtitle(title)
-         + scale_color_manual(values=colors))
+         + scale_color_manual(values=colors)
+         + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
 
-    plt.save(filename='../output/total_topic_{}.png'.format(specific_topic), width=8,height=6)
+    plt.save(filename='../output/' + file + '/total_topic_{}.png'.format(specific_topic), width=8,height=6)
     
     
     if by_community:
-        community_plot_frame = pd.DataFrame()
-        for community in communities_to_subset:
-            time = list(range(runtime)) + list(range(runtime)) + list(range(runtime))
-            labels = ['misinfo' for i in range(runtime)] + ['anti-misinfo' for i in range(runtime)] + ['noise' for i in range(runtime)]
-            misinfo_reads = misinfo[misinfo['Community']==community].iloc[:, 1:].sum(axis=0)
-            anti_misinfo_reads = anti[anti['Community']==community].iloc[:, 1:].sum(axis=0)
-            noise_reads = noise[noise['Community']==community].iloc[:, 1:].sum(axis=0)
-            plot_frame = pd.concat([misinfo_reads,anti_misinfo_reads,noise_reads]).to_frame()
-            plot_frame['time'] = time
-            plot_frame['label'] = labels
-            plot_frame['community'] = 'Community ' + str(community)
-            plot_frame = plot_frame.rename(columns={0:'reads'})
-            community_plot_frame = pd.concat([plot_frame, community_plot_frame])
 
         if specific_topic:
             title = 'Topic {} Information Read over Time by Community'.format(specific_topic)
         else:
             title = 'Total Information Read over Time'
             
-        plt=(ggplot(community_plot_frame, aes(x='time',y='reads', color = 'label'))
+        topic_frame_com = topic_frame
+        topic_frame_com['Reads (moving average)'] = topic_frame_com.groupby(['Community', 'Type', 'Mitigation'])['Reads'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+        topic_frame_com= topic_frame_com.reset_index()
+
+        plt=(ggplot(topic_frame_com, aes(x='Step',y='Reads (moving average)', color = 'Type', linetype = 'Mitigation'))
              + geom_line()
-             + facet_wrap('community')
+             + facet_wrap('Community')
              + ggtitle(title)
-             + scale_color_manual(values=colors))
+             + scale_color_manual(values=colors)
+             + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
         
-        output = '../output/topic_' + str(specific_topic) + '_by_community.png'
+        output = '../output/' + file + '/topic_' + str(specific_topic) + '_by_community.png'
         plt.save(filename=output, width=16,height=6)
     
     return 'Finished Making Plots!'
 
-
-
-plot_total_reads_over_time(by_community=True, specific_topic='0')
-plot_total_reads_over_time(by_community=True, specific_topic='1')
-plot_total_reads_over_time(by_community=True, specific_topic='2')
-plot_total_reads_over_time(by_community=True, specific_topic='3')
-
-
-def make_community_sentiment_plot(inpath):
-    community_sentiment = pd.read_csv(inpath)
+def make_community_sentiment_plot(inpath_none, inpath_mit, mitigation, midpoint, file):
+    community_sentiment_none = pd.read_csv(inpath_none)
+    community_sentiment_none['Mitigation'] = 'None'
+    community_sentiment_mit = pd.read_csv(inpath_mit)
+    community_sentiment_mit['Mitigation'] = str(mitigation)
+    
+    community_sentiment = pd.concat([community_sentiment_none, community_sentiment_mit])
+    
     community_sentiment['Topic'] = 'Topic ' + community_sentiment['Topic'].astype(int).apply(str)
     community_sentiment['Community'] = 'Community ' + community_sentiment['Community'].astype(int).apply(str)
     
     plt=(ggplot(community_sentiment,
-                aes(x='Time',y='Mean Sentiment', color = 'Topic'))
-         + geom_line()
+                aes(x='Time',y='Mean Sentiment', color = 'Topic', linetype = 'Mitigation'))
+         + geom_line(alpha = 0.4)
          + facet_wrap('Community')
          + ggtitle('Mean Belief for Communties by Topic')
-         + ylab('Mean Belief'))
+         + ylab('Mean Belief')
+         + geom_vline(aes(xintercept = midpoint), colour = 'green', linetype= 'dashed'))
 
-    plt.save(filename='../output/mean_sentiment_by_community.png', width = 10, height = 7)
+    plt.save(filename='../output/{}/mean_sentiment_by_community.png'.format(file), width = 10, height = 7)
 
-make_community_sentiment_plot(inpath =  inpath_community_sentiment)
+if not os.path.isdir('../../4_simulation/output/mitigation-none'):
+    print('Need to first run with no mitigation!!')
+else:
+    midpoint = 200
+    file = 'mitigation-stop_reading_misinfo-labelmethod-average_truth_perception_stratified-sample_method-top_avg_origin_degree'
+    inpath_community_sentiment_none = '../output/mitigation-none/community_sentiment_clean.csv'
+    inpath_community_sentiment_mit = '../output/{}/community_sentiment_clean.csv'.format(file)
+    mitigation = 'Stop Reading'
+    plot_total_reads_over_time(by_community=True, specific_topic=0, file = file, mitigation = mitigation, midpoint = midpoint)
+    plot_total_reads_over_time(by_community=True, specific_topic=1, file = file, mitigation = mitigation, midpoint = midpoint)
+    plot_total_reads_over_time(by_community=True, specific_topic=2, file = file, mitigation = mitigation, midpoint = midpoint)
+    plot_total_reads_over_time(by_community=True, specific_topic=3, file = file, mitigation = mitigation, midpoint = midpoint)
+    make_community_sentiment_plot(inpath_none =  inpath_community_sentiment_none, 
+                                  inpath_mit = inpath_community_sentiment_mit,
+                                  midpoint = midpoint,
+                                  mitigation = mitigation,
+                                  file=file)
+
+

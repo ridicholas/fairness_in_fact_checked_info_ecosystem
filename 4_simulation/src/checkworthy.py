@@ -39,6 +39,8 @@ class checkworthy():
         self.value = value
         self.topic = topic
         self.claim = claim
+        if self.claim_id not in self.checkworthy_data.keys():
+            self.update_keys()
 
 
     def update_keys(self):
@@ -103,13 +105,15 @@ class checkworthy():
             if distance > self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)]:
                 self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = distance
 
+    ''' Depricated   
+    
     def update_virality_outcome(self, time_from_launch):
         claim_id = self.claim_id
         if 'outcome_nodes_at_t{}'.format(self.outcome_time) not in self.checkworthy_data[claim_id].keys():
             self.checkworthy_data[claim_id]['outcome_nodes_at_t{}'.format(self.outcome_time)] = 0
         elif time_from_launch <= self.outcome_time:
             self.checkworthy_data[claim_id]['outcome_nodes_at_t{}'.format(self.outcome_time)] += 1
-
+    '''
 
     def sample_claims(self, num_to_sample=2000, sample_method='random'):
         import random
