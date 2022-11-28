@@ -33,21 +33,22 @@ subset_graph_file = '../output/simulation_net.gpickle'
 outpath_node_data_info = '../output/node_metadata.gpickle'
 outpath_stored_model = '../output/stored_model.pickle'
 outpath_all_claims = '../output/all_claims.pickle'
+outpath_com_read_tweets = '../output/community_read_tweets_by_type.pickle'
 
 num_topics = 4
 communities_to_subset = [3,56,43]
 learning_rate = 0.2
 NUM_CLAIMS = 6000 #this is number of claims per topic per timestep
-runtime = 300
+runtime = 200
 agg_interval = 3
 agg_steps = 3
 perc_nodes_to_subset = 0.1
 perc_bots = 0.1
-load_data = False
+load_data = True
 update_beliefs = True
 depths = [2,4,6]
 outcome_time = 48
-MIN_DEGREE = 10
+MIN_DEGREE = 5
 
 '''
 First topic (row) impacts every group the same, the other topics each impact
@@ -109,6 +110,7 @@ def run(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, impactednesses
     # This will capture the unique-ids of each tweet read by each node.
     node_read_tweets = {node:[] for node in G.nodes()}
     community_sentiment_through_time = {com:{t:{topic: [] for topic in range(num_topics)} for t in range(runtime)} for com in communities_to_subset}
+    community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(num_topics)} for t in range(runtime)} for com in communities_to_subset}
     node_read_tweets_by_time = {node:{t: [] for t in range(runtime)} for node in G.nodes()}
     topics = list(range(num_topics))
     all_claims = create_claims(num_claims = NUM_CLAIMS)
@@ -212,12 +214,18 @@ def run(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, impactednesses
                                                     topic_sentiment=topic_sentiment,
                                                     creator_prestige=creator_prestige,
                                                     claim_virality=virality)
-
+                            
+                            
                             retweet_perc.append(perc)
                             new_retweets.append(read_tweet)
                             # updates the tweets that nodes have read
                             node_read_tweets[node].append(read_tweet)
                             node_read_tweets_by_time[node][step].append(read_tweet)
+                            community_read_tweets_by_type = update_read_counts(community_read_tweets_by_type, 
+                                                                               topic = topic, 
+                                                                               info_type = value, 
+                                                                               com = data['Community'], 
+                                                                               step = step)
                             # update checkworthy data features
                             time_feature = int((step - all_info[read_tweet]['time-origin'])/agg_interval)+1
                             if time_feature <= agg_steps:
@@ -231,22 +239,7 @@ def run(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, impactednesses
                                     else:
                                         check.update_time_values(time_feature=time_feature, origin_node=origin_node)
                                 
-                                
-                            # udpate checkworthy outcome label - average virality at t=48hrs
-                            time_from_launch = step - all_info[read_tweet]['time-origin']
-                            if time_from_launch <= outcome_time:
-                                claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
-
-                                if data['degree'] > MIN_DEGREE: 
-                                    check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-                                    #this will count the first utterance by a node of degree > min degree as the origin
-                                    if claim_id not in check.checkworthy_data.keys():
-                                        check.update_keys()
-                                    else:
-                                        check.update_virality_outcome(time_from_launch=time_from_launch)
-
-                                
-
+                                        
 
                     for i in range(len(new_retweets)):
                         if retweet_perc[i] > np.random.uniform():
@@ -272,16 +265,19 @@ def run(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, impactednesses
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims
+    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims, community_read_tweets_by_type
 
 print('\n\n\n\n\n ----------- Running Simulation --------- \n\n\n\n\n')
 
 
-all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims = run(G = sampleG,
-                                                                                                    runtime = runtime,
-                                                                                                    agg_interval=agg_interval,
-                                                                                                    agg_steps=agg_steps,
-                                                                                                    outcome_time=outcome_time)
+all_info, \
+node_read_tweets, \
+community_sentiment_through_time, \
+node_read_tweets_by_time, \
+check, \
+G, \
+all_claims, \
+community_read_tweets_by_type = run(G = sampleG, runtime = runtime, agg_interval=agg_interval, agg_steps=agg_steps, outcome_time=outcome_time)
 
 
 print('\n\n\n\n\n ----------- Writing Data --------- \n\n\n\n\n')
@@ -304,6 +300,10 @@ with open(outpath_node_time_info, 'wb') as file:
 with open(outpath_checkworthy, 'wb') as file:
     pickle.dump(check, file, protocol=pickle.HIGHEST_PROTOCOL)
     
+with open(outpath_com_read_tweets, 'wb') as file:
+    pickle.dump(community_read_tweets_by_type, file, protocol=pickle.HIGHEST_PROTOCOL)
+    
+
 nx.write_gpickle(G, outpath_node_data_info)
 
 

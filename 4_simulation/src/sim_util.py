@@ -241,7 +241,14 @@ def update_topic_sentiment(current_sentiment, tweet_value, tweet_impactedness, n
     difference = learning_rate*(new_sentiment - current_sentiment)
     return current_sentiment + difference
 
-
+def update_read_counts(community_read_tweets_by_type, topic, info_type, com, step):
+    if info_type == 1:
+        community_read_tweets_by_type[com][step][topic]['misinfo'] += 1
+    elif info_type == 0:
+        community_read_tweets_by_type[com][step][topic]['noise'] += 1
+    else:
+        community_read_tweets_by_type[com][step][topic]['anti-misinfo'] += 1
+    return community_read_tweets_by_type
 
 
 

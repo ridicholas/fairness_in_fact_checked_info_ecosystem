@@ -18,6 +18,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import confusion_matrix, mean_squared_error
 
+mitigation_method = 'stop_reading_misinfo'
+label_to_use = 'average_truth_perception_stratified'
+sample_method = 'top_avg_origin_degree'
+
+if mitigation_method == 'None':
+    run_outfile = 'mitigation-none'
+    print('\n\n\n ---  Running with no mitigation --- \n\n\n')
+else:
+    run_outfile = 'mitigation-' + mitigation_method + '-labelmethod-' + label_to_use + '-sample_method-' + sample_method
+    print('\n\n\nRunning with\nmitigation method = ' + mitigation_method + ' &\nlabel method = ' + label_to_use + ' &\nsample method = ' + sample_method)
+if not os.path.isdir('../output/' + run_outfile):
+    os.makedirs('../output/' + run_outfile)
+
 
 
 path = '../../data/nodes_with_community.gpickle'
@@ -30,17 +43,18 @@ subset_graph_file = '../output/simulation_net.gpickle'
 inpath_node_data_info = '../output/node_metadata.gpickle'
 inpath_stored_model = '../output/stored_model.pickle'
 inpath_all_claims = '../output/all_claims.pickle'
+inpath_community_reads_over_time = '../output/community_read_tweets_by_type.pickle'
 
-
-outpath_info = '../output/mitigation/all_info.pickle'
-outpath_node_info = '../output/mitigation/node_info.pickle'
-outpath_community_sentiment = '../output/mitigation/community_sentiment.pickle'
-outpath_node_time_info = '../output/mitigation/node_time_info.pickle'
-outpath_checkworthy = '../output/mitigation/checkworthy_data.pickle'
-subset_graph_file = '../output/mitigation/simulation_net.gpickle'
-outpath_node_data_info = '../output/mitigation/node_metadata.gpickle'
-outpath_stored_model = '../output/mitigation/stored_model.pickle'
-outpath_all_claims = '../output/mitigation/all_claims.pickle'
+outpath_info = '../output/{}/all_info.pickle'.format(run_outfile)
+outpath_node_info = '../output/{}/node_info.pickle'.format(run_outfile)
+outpath_community_sentiment = '../output/{}/community_sentiment.pickle'.format(run_outfile)
+outpath_node_time_info = '../output/{}/node_time_info.pickle'.format(run_outfile)
+outpath_checkworthy = '../output/{}/checkworthy_data.pickle'.format(run_outfile)
+subset_graph_file = '../output/{}/simulation_net.gpickle'.format(run_outfile)
+outpath_node_data_info = '../output/{}/node_metadata.gpickle'.format(run_outfile)
+outpath_stored_model = '../output/{}/stored_model.pickle'.format(run_outfile)
+outpath_all_claims = '../output/{}/all_claims.pickle'.format(run_outfile)
+outpath_community_reads_over_time = '../output/{}/community_read_tweets_by_type.pickle'.format(run_outfile)
 
 nodes_to_sample = 100
 
@@ -48,7 +62,7 @@ num_topics = 4
 communities_to_subset = [3,56,43]
 learning_rate = 0.2
 NUM_CLAIMS = 6000 #this is number of claims per topic per timestep
-runtime = 300
+runtime = 200
 agg_interval = 3
 agg_steps = 3
 perc_nodes_to_subset = 0.1
@@ -81,12 +95,15 @@ with open(inpath_node_time_info, 'rb') as file:
 with open(inpath_checkworthy, 'rb') as file:
     check = pickle.load(file)
     
+with open(inpath_community_reads_over_time, 'rb') as file:
+    community_read_over_time = pickle.load(file)
+    
 G = nx.read_gpickle(inpath_node_data_info)
 
 
 
 print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
-check.sample_claims(num_to_sample=2000, sample_method='top_avg_origin_degree')
+check.sample_claims(num_to_sample=2000, sample_method=sample_method)
 
 
 print('\n\n\n\n\n ----------- Sampling Labels for Checkworthy Dataset --------- \n\n\n\n\n')
@@ -103,7 +120,7 @@ print('\n\n\n\n\n ----------- Training Checkworthy Model --------- \n\n\n\n\n')
 
 
 check_df = pd.DataFrame.from_dict(check.sampled_checkworthy_data).T.fillna(0)
-check_df['target'] = check_df['average_truth_perception_stratified']
+check_df['target'] = check_df[label_to_use]
 
 
 train, test = train_test_split(check_df, test_size=0.2)
@@ -114,7 +131,8 @@ test_x = test[[i for i in test.columns if ('truth' not in i) and ('claim' not in
 test_y = test[['target']]
 
 clf = xg.XGBRegressor().fit(train_x, train_y)
-print(mean_squared_error(test_y, clf.predict(test_x)))
+cols_when_model_builds = clf.get_booster().feature_names
+print('\n\n --- XGBoost Test Set Results (MSE)): ' + str(mean_squared_error(test_y, clf.predict(test_x))) + '----- \n\n')
 
 #print(confusion_matrix(test_y, clf.predict(test_x)))
 #plt.scatter(test_y, clf.predict(test_x))
@@ -125,6 +143,7 @@ print(mean_squared_error(test_y, clf.predict(test_x)))
 
 
 print('\n\n\n\n\n ----------- Running second half of simulation --------- \n\n\n\n\n')
+
 
 def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mitigation_type = "delete_from_inbox"):
     '''
@@ -139,11 +158,14 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
         node_read_tweets_by_time[node].update({t: [] for t in range(runtime, runtime*2)})
     for com in communities_to_subset:
         community_sentiment_through_time[com].update({t:{topic: [] for topic in range(num_topics)} for t in range(runtime, runtime*2)})
+    for com in communities_to_subset:
+        community_read_over_time[com].update({t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(num_topics)} for t in range(runtime, runtime*2)})
+
 
     
    
 
-    def new_tweets_func():
+    def new_tweets_func(check):
         all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
         new_tweets.append(unique_id)
         '''
@@ -155,7 +177,7 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
         else:
             check.update_agg_values()
 
-    def read_tweets_func():
+    def read_tweets_func(check):
         virality = all_claims[read_claim]['virality']
         topic_sentiment = data['sentiment'][topic]
         creator_prestige = prestige[all_info[read_tweet]['node-origin']]
@@ -189,11 +211,6 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
             claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
             check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
             check.update_time_values(time_feature=time_feature, origin_node=origin_node)
-        time_from_launch = step - all_info[read_tweet]['time-origin']
-        if time_from_launch <= outcome_time:
-            claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
-            check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-            check.update_virality_outcome(time_from_launch=time_from_launch)
 
 
     bar = progressbar.ProgressBar()
@@ -207,6 +224,7 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
         ##for each time step, determine which claims to fact check using classifier
         check_df = pd.DataFrame.from_dict(check.checkworthy_data).T.fillna(0)
         x = check_df[[i for i in check_df.columns if ('truth' not in i) and ('target' not in i) and ('claim' not in i) and ('outcome' not in i) and ('value' not in i)]]
+        x = x[cols_when_model_builds]
         preds = pd.Series(clf.predict(x), index=check_df.index)
         preds = preds.drop(fact_checked)
         preds.sort_values(ascending=False, inplace=True)
@@ -253,9 +271,9 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
                         if mitigation_type == 'stop_reading_misinfo':
                             #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
                             if not ((str(topic) + '-' + str(claim) in fact_checked) and (value == 1)):
-                                new_tweets_func()
+                                new_tweets_func(check=check)
                         else:
-                            new_tweets_func()
+                            new_tweets_func(check=check)
                         
 
 
@@ -287,7 +305,16 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
                                     update_value = -5
                                 read_tweets_func()
                             else:
-                                read_tweets_func()
+                                read_tweets_func(check=check)
+                                community_read_over_time = update_read_counts(community_read_tweets_by_type = community_read_over_time, 
+                                                                               topic = topic,
+                                                                               info_type = value, 
+                                                                               com = data['Community'],
+                                                                               step = step)
+                        
+                        # update read counts by type of info
+                        
+
 
                     for i in range(len(new_retweets)):
                         if retweet_perc[i] > np.random.uniform():
@@ -310,17 +337,26 @@ def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mi
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
 
-    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims
+    return all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims, community_read_over_time
 
 
 
 
-all_info, node_read_tweets, community_sentiment_through_time, node_read_tweets_by_time, check, G, all_claims = run_second_half(G = G,
-                                                                                                    runtime = runtime,
-                                                                                                    agg_interval=agg_interval,
-                                                                                                    agg_steps=agg_steps,
-                                                                                                    outcome_time=outcome_time,
-                                                                                                    mitigation_type = "change_belief_updates")
+all_info, \
+node_read_tweets, \
+community_sentiment_through_time, \
+node_read_tweets_by_time, \
+check, \
+G, \
+all_claims, \
+community_read_over_time = run_second_half(G = G,
+                                            runtime = runtime,
+                                            agg_interval=agg_interval,
+                                            agg_steps=agg_steps,
+                                            outcome_time=outcome_time,
+                                            community_read_over_time = community_read_over_time,
+                                            mitigation_type = mitigation_method)
+
 
 
 print('\n\n\n\n\n ----------- Writing Data --------- \n\n\n\n\n')
@@ -342,5 +378,10 @@ with open(outpath_node_time_info, 'wb') as file:
 
 with open(outpath_checkworthy, 'wb') as file:
     pickle.dump(check, file, protocol=pickle.HIGHEST_PROTOCOL)
+    
+with open(outpath_community_reads_over_time, 'wb') as file:
+    pickle.dump(community_read_over_time, file, protocol=pickle.HIGHEST_PROTOCOL)
+   
+
     
 nx.write_gpickle(G, outpath_node_data_info)
