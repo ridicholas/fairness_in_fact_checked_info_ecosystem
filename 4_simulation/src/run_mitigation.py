@@ -144,7 +144,11 @@ print('\n\n --- XGBoost Test Set Results (MSE)): ' + str(mean_squared_error(test
 
 print('\n\n\n\n\n ----------- Running second half of simulation --------- \n\n\n\n\n')
 
-def run_second_half(G, runtime, community_read_over_time, agg_interval=3, agg_steps=3, outcome_time=48, mitigation_type = "delete_from_inbox"):
+
+def run_second_half(G, runtime, agg_interval=3, agg_steps=3, outcome_time=48, mitigation_type = "delete_from_inbox"):
+    '''
+    mitigation_types: "delete_from_inbox", "stop_reading_misinfo", "None", "change_belief_updates"
+    '''
 
     prestige_values = percentile(list(dict(G.in_degree()).values()))
     nodes = list(G.nodes())
@@ -184,7 +188,7 @@ def run_second_half(G, runtime, community_read_over_time, agg_interval=3, agg_st
         if update_beliefs and data['kind'] != 'bot':
             data['num_read'][topic] += 1
             data['sentiment'][topic] = update_topic_sentiment(current_sentiment=data['sentiment'][topic],
-                                                            tweet_value = value,
+                                                            tweet_value = update_value,
                                                             tweet_impactedness=data['impactedness'][topic],
                                                             num_read = data['num_read'][topic],
                                                             learning_rate = learning_rate)
@@ -288,16 +292,18 @@ def run_second_half(G, runtime, community_read_over_time, agg_interval=3, agg_st
                         if read_tweet not in node_read_tweets[node]:
                             topic = all_info[read_tweet]['topic']
                             value = all_info[read_tweet]['value']
+                            update_value = value
                             read_claim = all_info[read_tweet]['claim']
                             #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
                             if mitigation_type == "stop_reading_misinfo":
                                 if not ((str(topic) + '-' + str(read_claim) in fact_checked) and (value == 1)):
-                                    read_tweets_func(check=check)
-                                    community_read_over_time = update_read_counts(community_read_tweets_by_type = community_read_over_time, 
-                                                                                   topic = topic,
-                                                                                   info_type = value, 
-                                                                                   com = data['Community'],
-                                                                                   step = step)
+                                    read_tweets_func()
+                            elif mitigation_type == 'change_belief_updates':
+                                if value == 1:
+                                    update_value = 5
+                                if value == -1:
+                                    update_value = -5
+                                read_tweets_func()
                             else:
                                 read_tweets_func(check=check)
                                 community_read_over_time = update_read_counts(community_read_tweets_by_type = community_read_over_time, 
@@ -350,6 +356,7 @@ community_read_over_time = run_second_half(G = G,
                                             outcome_time=outcome_time,
                                             community_read_over_time = community_read_over_time,
                                             mitigation_type = mitigation_method)
+
 
 
 print('\n\n\n\n\n ----------- Writing Data --------- \n\n\n\n\n')
