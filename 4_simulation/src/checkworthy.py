@@ -39,6 +39,8 @@ class checkworthy():
         self.value = value
         self.topic = topic
         self.claim = claim
+        if self.claim_id not in self.checkworthy_data.keys():
+            self.update_keys()
 
 
     def update_keys(self):
