@@ -80,20 +80,25 @@ def plot_total_reads_over_time(midpoint, mitigation, file, by_community=False,sp
     
     return 'Finished Making Plots!'
 
-def make_community_sentiment_plot(inpath_none, inpath_mit, mitigation, midpoint, file):
+def make_community_sentiment_plot(inpath_none, inpath_mit, mitigation, midpoint, file, smooth_interval):
     community_sentiment_none = pd.read_csv(inpath_none)
     community_sentiment_none['Mitigation'] = 'None'
     community_sentiment_mit = pd.read_csv(inpath_mit)
     community_sentiment_mit['Mitigation'] = str(mitigation)
     
     community_sentiment = pd.concat([community_sentiment_none, community_sentiment_mit])
-    
+    community_sentiment = community_sentiment.sort_values(by=['Mitigation', 'Community', 'Topic', 'Time'])
+    community_sentiment['Mean Sentiment (smooth)'] = community_sentiment.groupby(['Community','Topic','Mitigation'])['Mean Sentiment'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+    community_sentiment = community_sentiment.reset_index()
     community_sentiment['Topic'] = 'Topic ' + community_sentiment['Topic'].astype(int).apply(str)
     community_sentiment['Community'] = 'Community ' + community_sentiment['Community'].astype(int).apply(str)
     
+    
+    
+    
     plt=(ggplot(community_sentiment,
-                aes(x='Time',y='Mean Sentiment', color = 'Topic', linetype = 'Mitigation'))
-         + geom_line(alpha = 0.4)
+                aes(x='Time',y='Mean Sentiment (smooth)', color = 'Topic', linetype = 'Mitigation'))
+         + geom_line(alpha = 0.8)
          + facet_wrap('Community')
          + ggtitle('Mean Belief for Communties by Topic')
          + ylab('Mean Belief')
@@ -105,7 +110,7 @@ if not os.path.isdir('../../4_simulation/output/mitigation-none'):
     print('Need to first run with no mitigation!!')
 else:
     midpoint = 200
-    file = 'mitigation-stop_reading_misinfo-labelmethod-average_truth_perception_stratified-sample_method-top_avg_origin_degree'
+    file = 'mitigation-stop_reading_misinfo-labelmethod-average_truth_perception_random-sample_method-top_avg_origin_degree'
     inpath_community_sentiment_none = '../output/mitigation-none/community_sentiment_clean.csv'
     inpath_community_sentiment_mit = '../output/{}/community_sentiment_clean.csv'.format(file)
     mitigation = 'Stop Reading'
@@ -117,6 +122,7 @@ else:
                                   inpath_mit = inpath_community_sentiment_mit,
                                   midpoint = midpoint,
                                   mitigation = mitigation,
-                                  file=file)
+                                  file=file,
+                                  smooth_interval=25)
 
 

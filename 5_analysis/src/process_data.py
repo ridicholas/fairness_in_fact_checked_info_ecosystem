@@ -15,7 +15,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 mitigation_method = 'stop_reading_misinfo'
-label_to_use = 'average_truth_perception_stratified'
+label_to_use = 'average_truth_perception_random'
 sample_method = 'top_avg_origin_degree'
 
 if mitigation_method == 'None':
