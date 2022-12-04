@@ -13,7 +13,7 @@ from scipy.stats import beta
 from random import choice
 
 class TopicSim():
-    
+
     def __init__(self, impactedness, beliefs, num_topics, runtime, communities, num_claims):
 
         self.impactedness = impactedness
@@ -27,33 +27,33 @@ class TopicSim():
         self.community_sentiment_through_time = {}
         self.community_read_tweets_by_type = {}
         self.node_read_tweets_by_time = {}
-        
+
     def set_impactedness(self, impactedness):
         self.impactedness = impactedness
-        
+
     def set_beliefs(self, beliefs):
         self.beliefs = beliefs
-        
+
     def set_network(self, G):
         self.G = G
-        
+
     def return_network(self):
         return self.G
-        
+
     def set_check(self, check):
         self.check = check
-        
+
     def return_check(self):
         return self.check
-    
+
     def set_post_duration(self, post_duration):
         self.post_duration = post_duration
-    
+
     def load_simulation_network(self, ready_network_path):
         import pickle
         with open(ready_network_path, "rb") as f:
             self.G = pickle.load(f)
-       
+
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
     def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots):
@@ -69,11 +69,11 @@ class TopicSim():
         self.G = sampleG
 
 
-    
+
 
     def run(self, period, learning_rate, fact_checks_per_step, mitigation_type):
-        
-        
+
+
         G = self.G
         check = self.check
         in_degree = list(dict(G.in_degree()).values())
@@ -95,9 +95,9 @@ class TopicSim():
             community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
             node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}
             all_claims = self.create_claims(num_claims = self.num_claims)
-        
+
         elif period == 'post':
-            
+
             all_info = self.all_info
             node_read_tweets = self.node_read_tweets
             community_sentiment_through_time = self.community_sentiment_through_time
@@ -105,8 +105,8 @@ class TopicSim():
             all_claims = self.all_claims
             community_read_tweets_by_type = self.community_read_tweets_by_type
 
-            
-            
+
+
             time = range(self.runtime, self.runtime*self.post_duration)
             for node in nodes:
                 node_read_tweets_by_time[node].update({t: [] for t in range(self.runtime, self.runtime*self.post_duration)})
@@ -133,12 +133,12 @@ class TopicSim():
                 preds.sort_values(ascending=False, inplace=True)
                 fact_checked = fact_checked + list(preds.index[0:fact_checks_per_step])
                 fact_checked = [*set(fact_checked)]
-            
-            
+
+
             rankings = self.calculate_sentiment_rankings(G = G, topics = topics)
-            
+
             for node, data in G.nodes(data=True):
-                
+
                 if data['wake'] == step:
                     data['wake'] = data['wake'] + \
                         np.round(1 + np.random.exponential(scale=1 / data['lambda']))
@@ -160,7 +160,7 @@ class TopicSim():
                             claim = self.choose_claim(value = value, num_claims=self.num_claims)
                             unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                             claim_id = str(topic) + '-' + str(claim)
-                            
+
                             if mitigation_type == 'stop_reading_misinfo':
                                 #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
                                 if not ((str(topic) + '-' + str(claim) in fact_checked) and (value == 1)):
@@ -187,7 +187,7 @@ class TopicSim():
                                 else:
                                     check.update_agg_values()
 
-                            
+
                     '''
                     Read tweets, update beliefs, and re-tweet
                     '''
@@ -239,9 +239,9 @@ class TopicSim():
                                             check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
                                             check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
-                                        community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type, 
+                                        community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                                 topic = topic,
-                                                                                                info_type = value, 
+                                                                                                info_type = value,
                                                                                                 com = data['Community'],
                                                                                                 step = step)
                                 else:
@@ -279,14 +279,14 @@ class TopicSim():
                                         check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
                                         check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
-                                    community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type, 
+                                    community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                             topic = topic,
-                                                                                            info_type = value, 
+                                                                                            info_type = value,
                                                                                             com = data['Community'],
                                                                                             step = step)
-                            
+
                             # update read counts by type of info
-                            
+
 
 
                         for i in range(len(new_retweets)):
@@ -308,9 +308,11 @@ class TopicSim():
                     '''
                     for topic in range(self.num_topics):
                         community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
-                        
-                        
-        self.all_info = all_info
+
+        if period == 'pre':
+            self.all_info = all_info
+        else:
+            self.all_info = 'Removed for light storage'
         self.node_read_tweets = node_read_tweets
         self.community_sentiment_through_time = community_sentiment_through_time
         self.node_read_tweets_by_time = node_read_tweets_by_time
@@ -318,7 +320,7 @@ class TopicSim():
         self.G = G
         self.all_claims = all_claims
         self.community_read_tweets_by_type = community_read_tweets_by_type
-        
+
         
 
     def choose_topic(self, data):
@@ -372,7 +374,7 @@ class TopicSim():
         c = claims.set_index('claim_id')
         c_dict = c.to_dict('index')
         return c_dict
-    
+
     def calculate_sentiment_rankings(self, G, topics):
 
         import networkx as nx
@@ -451,9 +453,9 @@ class TopicSim():
         #nx.write_gexf(G2, outpath)
 
         return G2
-    
+
     def set_node_attributes(G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
-        
+
         import numpy as np
         import networx as nx
         import random
@@ -530,8 +532,8 @@ class TopicSim():
         nx.set_node_attributes(G, degrees, "degree")
 
         return G
-    
-    
+
+
     def retweet_behavior(self, topic, value, topic_sentiment, creator_prestige, claim_virality):
         if value == -1:
             retweet_perc = np.min([1, (1 - topic_sentiment)*creator_prestige*claim_virality])
@@ -557,8 +559,8 @@ class TopicSim():
             community_read_tweets_by_type[com][step][topic]['anti-misinfo'] += 1
         return community_read_tweets_by_type
 
-    
-    
+
+
     def percentile(self, x):
         import numpy as np
         from scipy.stats import rankdata
@@ -566,6 +568,3 @@ class TopicSim():
         x = np.array(x)
         ranks = rankdata(x)
         return(ranks/len(x))
-
-
-
