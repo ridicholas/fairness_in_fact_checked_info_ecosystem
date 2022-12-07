@@ -1,0 +1,34 @@
+---
+  num_topics: 4
+  communities:
+    - 3
+    - 56
+    - 43
+  learning_rate: 0.25
+  num_claims: 6000 #this is number of claims per topic per timestep
+  runtime: 200
+  agg_interval: 3
+  agg_steps: 3
+  perc_nodes_to_subset: 0.1
+  perc_bots: 0.1
+  load_data: True
+  update_beliefs: True
+  depths:
+    - 1
+    - 2
+    - 3
+  min_degree: 5
+  fact_checks_per_step: 10
+  claims_to_sample: 500
+  nodes_to_sample: 100
+  post_duration: 3
+  mitigation_method: 'stop_reading_misinfo'
+  label_to_use: 'average_truth_perception_random'
+  sample_method: 'top_avg_origin_degree'
+  raw_network_path: '../../data/nodes_with_community.gpickle'
+  ready_network_path: '../output/simulation_net.gpickle'
+  output_sim_midpoint: '../output/simulation_pre_period'
+  output_sim_final_no_intervention: '../output/simulation_final_no_intervention'
+  output_sim_final_intervention_random: '../output/simulation_final_intervention_random_label'
+  output_sim_final_intervention_kc: '../output/simulation_final_intervention_kc_label'
+  output_sim_final_intervention_stratified: '../output/simulation_final_intervention_stratified_label'

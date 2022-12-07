@@ -7,17 +7,16 @@ Created on Mon Nov 21 13:26:27 2022
 """
 import pandas as pd
 
-class checkworthy():
+class Checkworthy():
 
 
-    def __init__(self, agg_interval, agg_steps, G, depths, outcome_time, impactednesses):
+    def __init__(self, agg_interval, agg_steps, depths, impactednesses):
         self.checkworthy_data = {}
+        self.sampled_checkworthy_data = {}
         self.agg_interval = agg_interval
         self.agg_steps = agg_steps
-        self.G = G
-        self.outcome_time = outcome_time
         self.impactednesses = impactednesses
-        self.depths = [2,4,6]
+        self.depths = depths
         self.node = 'empty'
         self.data = 'empty'
         self.claim_id = 'empty'
@@ -30,6 +29,8 @@ class checkworthy():
         self.get_node_attributes = get_node_attributes
 
 
+    def set_network(self, G):
+        self.G = G
 
 
     def intake_information(self, node, data, claim_id, value, topic, claim):
@@ -72,7 +73,6 @@ class checkworthy():
 
         claim_id = self.claim_id
         node = self.node
-        G = self.G
         data = self.data
         depths = self.depths
 
@@ -96,7 +96,7 @@ class checkworthy():
             self.checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)] += (data['degree'] - self.checkworthy_data[claim_id]['step{}_avg_degree_visited'.format(time_feature)])/self.checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
             self.checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)] += (data['centrality'] - self.checkworthy_data[claim_id]['step{}_avg_centrality_visited'.format(time_feature)])/self.checkworthy_data[claim_id]['step{}_nodes_visited'.format(time_feature)]
 
-            distance = self.shortest_path_length(G, node, origin_node)
+            distance = self.shortest_path_length(self.G, node, origin_node)
 
             for depth in depths:
                 if distance == depth:
@@ -105,15 +105,6 @@ class checkworthy():
             if distance > self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)]:
                 self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = distance
 
-    ''' Depricated   
-    
-    def update_virality_outcome(self, time_from_launch):
-        claim_id = self.claim_id
-        if 'outcome_nodes_at_t{}'.format(self.outcome_time) not in self.checkworthy_data[claim_id].keys():
-            self.checkworthy_data[claim_id]['outcome_nodes_at_t{}'.format(self.outcome_time)] = 0
-        elif time_from_launch <= self.outcome_time:
-            self.checkworthy_data[claim_id]['outcome_nodes_at_t{}'.format(self.outcome_time)] += 1
-    '''
 
     def sample_claims(self, num_to_sample=2000, sample_method='random'):
         import random
@@ -188,3 +179,21 @@ class checkworthy():
 
             mean_survey = np.mean(survey_results)
             self.sampled_checkworthy_data[claim_id]['average_truth_perception_{}'.format(sample_method)] = mean_survey
+    
+    def train_model(self, label_to_use):
+        import pandas as pd
+        import xgboost as xg
+        from sklearn.model_selection import train_test_split
+        from sklearn.metrics import mean_squared_error
+
+        check_df = pd.DataFrame.from_dict(self.sampled_checkworthy_data).T.fillna(0)
+        check_df['target'] = check_df[label_to_use]
+        train, test = train_test_split(check_df, test_size=0.2)
+        train_x = train[[i for i in train.columns if ('truth' not in i) and ('claim' not in i) and ('target' not in i) and ('outcome' not in i) and ('value' not in i)]]
+        train_y = train[['target']]
+        test_x = test[[i for i in test.columns if ('truth' not in i) and ('claim' not in i) and ('target' not in i) and ('outcome' not in i) and ('value' not in i)]]
+        test_y = test[['target']]
+        clf = xg.XGBRegressor().fit(train_x, train_y)
+        self.cols_when_model_builds = clf.get_booster().feature_names
+        print('\n\n --- XGBoost Test Set Results (MSE)): ' + str(mean_squared_error(test_y, clf.predict(test_x))) + '----- \n\n')
+        self.clf = clf

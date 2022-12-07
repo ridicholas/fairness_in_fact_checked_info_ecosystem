@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 import progressbar
-import pandas as pd
-import checkworthy
 
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -14,86 +12,104 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 #read in files from 4_simulation/output
 
 
-mitigation_method = 'stop_reading_misinfo'
-label_to_use = 'average_truth_perception_stratified'
-sample_method = 'top_avg_origin_degree'
-
-if mitigation_method == 'None':
-    run_outfile = 'mitigation-none'
-    print('\n\n\n ---  Running with no mitigation --- \n\n\n')
-else:
-    run_outfile = 'mitigation-' + mitigation_method + '-labelmethod-' + label_to_use + '-sample_method-' + sample_method
-    print('\n\n\nRunning with\nmitigation method = ' + mitigation_method + ' &\nlabel method = ' + label_to_use + ' &\nsample method = ' + sample_method)
-
-if not os.path.isdir('../output/' + run_outfile):
-    os.makedirs('../output/' + run_outfile)
-
-
-inpath_community_read_over_time_mit = '../../4_simulation/output/{}/community_read_tweets_by_type.pickle'.format(run_outfile)
-inpath_sentiment_mit = '../../4_simulation/output/{}/community_sentiment.pickle'.format(run_outfile)
-
-
-with open(inpath_sentiment_mit, 'rb') as file:
-    community_sentiment = pickle.load(file)
-
-with open(inpath_community_read_over_time_mit, 'rb') as file:
-    community_read_over_time = pickle.load(file)
-
-
-
-
-
-def make_reads_by_time_frame(community_read_over_time):
-    
-    cols = ['Community', 'Step', 'Topic', 'Type', 'Reads']
-    anti_frame = pd.DataFrame(columns = cols)
-    noise_frame = pd.DataFrame(columns = cols)
-    misinfo_frame = pd.DataFrame(columns = cols)
-    
-    bar = progressbar.ProgressBar()
-    for com in bar(list(community_read_over_time.keys())):
-        for step in list(community_read_over_time[com].keys()):
-            for topic in list(community_read_over_time[com][step].keys()):
-                count_anti = community_read_over_time[com][step][topic]['anti-misinfo']
-                count_noise = community_read_over_time[com][step][topic]['noise']
-                count_misinfo = community_read_over_time[com][step][topic]['misinfo']
-                # append rows
-                anti_frame.loc[len(anti_frame)] = [com, step, topic, 'anti-misinfo', count_anti]
-                noise_frame.loc[len(noise_frame)] = [com, step, topic, 'noise', count_noise]
-                misinfo_frame.loc[len(misinfo_frame)] = [com, step, topic, 'misinfo', count_misinfo]
-    return anti_frame, noise_frame, misinfo_frame
-
-                
-                
+def make_reads_by_time_frame(infile, reps, modules):
     
 
-def process_community_sentiment(community_sentiment):
+    import TopicSim
+    import checkworthy    
+    import gc
 
-    result = pd.DataFrame(columns = ['Community','Topic','Time','Mean Sentiment'])
-    for comm in list(community_sentiment.keys()):
-        for t in list(community_sentiment[comm].keys()):
-            for topic in list(community_sentiment[comm][t].keys()):
-                mean_sentiment = np.mean(community_sentiment[comm][t][topic])
-                result.loc[len(result)] = [comm,topic,t,mean_sentiment]
-
-    result = result.sort_values(by=['Community','Topic','Time'])
+    result = pd.DataFrame()
+    gc.enable()
+    for rep in range(reps):
+        
+        print('\n\n\n\n\n Processing Reads Data - Repetition #' + str(rep) + '------ \n\n\n\n')
+        
+        for mod in modules:
+        
+            with open(infile + mod + str(rep) + '.pickle', 'rb') as file:
+                sim = pickle.load(file)
+    
+            community_read_over_time = sim.community_read_tweets_by_type
+            
+            del sim
+            gc.collect()
+            
+            cols = ['Community', 'Step', 'Topic', 'Type', 'Rep','Intervention','Reads']
+            anti_frame = pd.DataFrame(columns = cols)
+            noise_frame = pd.DataFrame(columns = cols)
+            misinfo_frame = pd.DataFrame(columns = cols)
+        
+            bar = progressbar.ProgressBar()
+            for com in bar(list(community_read_over_time.keys())):
+                for step in list(community_read_over_time[com].keys()):
+                    for topic in list(community_read_over_time[com][step].keys()):
+                        count_anti = community_read_over_time[com][step][topic]['anti-misinfo']
+                        count_noise = community_read_over_time[com][step][topic]['noise']
+                        count_misinfo = community_read_over_time[com][step][topic]['misinfo']
+                        # append rows
+                        anti_frame.loc[len(anti_frame)] = [com, step, topic, 'anti-misinfo', rep, mod, count_anti]
+                        noise_frame.loc[len(noise_frame)] = [com, step, topic, 'noise', rep, mod, count_noise]
+                        misinfo_frame.loc[len(misinfo_frame)] = [com, step, topic, 'misinfo', rep, mod, count_misinfo]
+                    
+            result = pd.concat([result, anti_frame, noise_frame, misinfo_frame])
+            
     return result
 
+                
+                
+    
 
-if not os.path.isdir('../../4_simulation/output/mitigation-none'):
-    print('Need to first run with no mitigation!!')
+def process_community_belief(infile, reps, modules):
 
+    import TopicSim
+    import checkworthy    
+    import gc
+
+
+    result = pd.DataFrame(columns = ['Community','Topic','Time', 'Rep', 'Intervention', 'Mean Belief'])
+    gc.enable()
+
+    for rep in range(reps):
+        
+        print('\n\n\n\n\n Processing Belief Data - Repetition #' + str(rep) + '------ \n\n\n\n')
+
+        for mod in modules:
+            
+            with open(infile + mod + str(rep) + '.pickle', 'rb') as file:
+                sim = pickle.load(file)
+                
+            community_sentiment_through_time = sim.community_sentiment_through_time
+            
+            del sim
+            gc.collect()
+            
+            for comm in list(community_sentiment_through_time.keys()):
+                for t in list(community_sentiment_through_time[comm].keys()):
+                    for topic in list(community_sentiment_through_time[comm][t].keys()):
+                        mean_sentiment = np.mean(community_sentiment_through_time[comm][t][topic])
+                        result.loc[len(result)] = [comm,topic,t,rep,mod,mean_sentiment]
+               
+    result = result.sort_values(by=['Rep', 'Intervention', 'Community','Topic','Time'])
+             
+    return result
+
+                
 
 print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
 
-clean_community_sentiment = process_community_sentiment(community_sentiment=community_sentiment)
-clean_community_sentiment.to_csv('../output/{}/community_sentiment_clean.csv'.format(run_outfile), index = False)
+clean_community_belief = process_community_belief(infile = '../../4_simulation/output/simulation_final_',
+                                                  reps = 8,
+                                                  modules=['no_intervention','intervention_random_label', 'intervention_stratified_label', 'intervention_kc_label'])
+
+clean_community_belief.to_csv('../output/exp_results_community_belief.csv', index = False)
 
 
 print('\n\n\n ------- Processing Information Read Over Time ------- \n\n\n')
 
-node_by_time_anti, node_by_time_noise, node_by_time_misinfo = make_reads_by_time_frame(community_read_over_time = community_read_over_time)
-node_by_time_misinfo.to_pickle('../output/{}/node_by_time_misinfo.pickle'.format(run_outfile))
-node_by_time_noise.to_pickle('../output/{}/node_by_time_noise.pickle'.format(run_outfile))
-node_by_time_anti.to_pickle('../output/{}/node_by_time_anti.pickle'.format(run_outfile))
+result = make_reads_by_time_frame(infile = '../../4_simulation/output/simulation_final_',
+                                  reps = 8,
+                                  modules = ['no_intervention','intervention_random_label', 'intervention_stratified_label', 'intervention_kc_label'])
+
+result.to_pickle('../output/exp_results_information_read_aggregated.pickle')
 
