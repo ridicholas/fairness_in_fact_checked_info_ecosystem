@@ -26,6 +26,7 @@ class TopicSim():
         self.node_read_tweets = {}
         self.community_sentiment_through_time = {}
         self.community_read_tweets_by_type = {}
+        self.community_checked_tweets_by_type = {}
         self.node_read_tweets_by_time = {}
 
     def set_impactedness(self, impactedness):
@@ -95,6 +96,8 @@ class TopicSim():
             community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
             node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}
             all_claims = self.create_claims(num_claims = self.num_claims)
+            community_checked_tweets_by_type = {}
+            
 
         elif period == 'post':
 
@@ -104,6 +107,7 @@ class TopicSim():
             node_read_tweets_by_time = self.node_read_tweets_by_time
             all_claims = self.all_claims
             community_read_tweets_by_type = self.community_read_tweets_by_type
+            community_checked_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)} for com in self.communities}
 
 
 
@@ -113,6 +117,7 @@ class TopicSim():
             for com in self.communities:
                 community_sentiment_through_time[com].update({t:{topic: [] for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
                 community_read_tweets_by_type[com].update({t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
+                community_checked_tweets_by_type[com].update({t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
 
 
 
@@ -202,6 +207,15 @@ class TopicSim():
                                 topic = all_info[read_tweet]['topic']
                                 value = all_info[read_tweet]['value']
                                 read_claim = all_info[read_tweet]['claim']
+
+                                #if claim is fact checked, add it to checked by type tracker
+                                if (str(topic) + '-' + str(read_claim)) in fact_checked:
+                                    community_checked_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_checked_tweets_by_type,
+                                                                                                topic = topic,
+                                                                                                info_type = value,
+                                                                                                com = data['Community'],
+                                                                                                step = step)
+
                                 #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
                                 if mitigation_type == "stop_reading_misinfo":
                                     if not ((str(topic) + '-' + str(read_claim) in fact_checked) and (value == 1)):
@@ -313,6 +327,7 @@ class TopicSim():
             self.all_info = all_info
         else:
             self.all_info = 'Removed for light storage'
+            
         self.node_read_tweets = node_read_tweets
         self.community_sentiment_through_time = community_sentiment_through_time
         self.node_read_tweets_by_time = node_read_tweets_by_time
@@ -320,6 +335,8 @@ class TopicSim():
         self.G = G
         self.all_claims = all_claims
         self.community_read_tweets_by_type = community_read_tweets_by_type
+        self.community_checked_tweets_by_type = community_checked_tweets_by_type
+        
 
         
 
@@ -457,7 +474,7 @@ class TopicSim():
     def set_node_attributes(G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
 
         import numpy as np
-        import networx as nx
+        import networkx as nx
         import random
         '''
 
