@@ -309,16 +309,23 @@ class TopicSim():
                     for topic in range(self.num_topics):
                         community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
+        
         if period == 'pre':
             self.all_info = all_info
+            self.node_read_tweets_by_time = node_read_tweets_by_time
+            self.node_read_tweets = node_read_tweets
+            self.all_claims = all_claims
         else:
             self.all_info = 'Removed for light storage'
-        self.node_read_tweets = node_read_tweets
-        self.community_sentiment_through_time = community_sentiment_through_time
-        self.node_read_tweets_by_time = node_read_tweets_by_time
-        self.check = check
+            self.node_read_tweets = 'Removed for light storage'
+            self.node_read_tweets_by_time = 'Removed  for light storage'
+            self.all_claims = 'Removed for light storage'
+        
+        # These objects are used in process_data.py
+        check.set_network(G=G)
         self.G = G
-        self.all_claims = all_claims
+        self.check = check
+        self.community_sentiment_through_time = community_sentiment_through_time
         self.community_read_tweets_by_type = community_read_tweets_by_type
 
         
@@ -342,7 +349,7 @@ class TopicSim():
         Bots produce misinformation 80% of the time
         '''
         if agent_type != 'bot':
-            deviation_rank = rankings.loc[node].loc['rank' + str(topic)]
+            deviation_rank = rankings[str(node)][topic]
             raw = beta.rvs(5 + deviation_rank, 5 - deviation_rank, size=1)
             value = np.where(raw < 0.3333, -1, np.where(raw >= 0.3333 and raw < 0.666, 0, 1))[0]
         else:
@@ -391,19 +398,20 @@ class TopicSim():
         One potential issue here is if sentiment is tightly clustered for all agents, this will sort of artificially make some agents produce more/less misinformation in that case.
         '''
         all_node_sentiments = nx.get_node_attributes(G, 'sentiment')
-        rankings = pd.DataFrame(index = all_node_sentiments.keys())
+        node_sentiments = [[key, all_node_sentiments[key][topic], topic] for key in all_node_sentiments.keys() for topic in topics]
+        
+        sentiments = pd.DataFrame(node_sentiments, columns = ['node', 'sentiment', 'topic']).sort_values(by=['topic', 'node'])
+        
+        median_sentiment = np.median(sentiments.sentiment.to_list())
+        deviations = [np.absolute(i - median_sentiment) for i in sentiments.sentiment.to_list()]
+        sentiments['deviations'] = deviations
+        sentiments['rank'] = np.where(sentiments['sentiment'] < median_sentiment,
+                                                     -1*sentiments['deviations'].rank(method='max')/len(sentiments),
+                                                     sentiments['deviations'].rank(method='max')/len(sentiments))
+        
+        sentiments_wide = pd.pivot(sentiments, index='node', columns = 'topic', values = 'rank').to_dict(orient='index')
 
-        for topic in topics:
-            node_sentiments = [all_node_sentiments[key][topic] for key in all_node_sentiments.keys()]
-            median = np.median(node_sentiments)
-            deviations = [np.absolute(i - median) for i in node_sentiments]
-            rankings['sentiment' + str(topic)] = node_sentiments
-            rankings['deviation' + str(topic)] = deviations
-            rankings['rank' + str(topic)] = np.where(rankings['sentiment' + str(topic)] < median,
-                                                     -1*rankings['deviation' + str(topic)].rank(method='max')/len(rankings),
-                                                     rankings['deviation' + str(topic)].rank(method='max')/len(rankings))
-
-        return rankings
+        return sentiments_wide
 
 
 
