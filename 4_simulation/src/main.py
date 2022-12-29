@@ -10,7 +10,15 @@ from checkworthy import Checkworthy
 from TopicSim import TopicSim
 import yaml
 import pickle
+
+import os
+
+#making sure wd is file directory so hardcoded paths work
+os.chdir(os.path.dirname(os.path.abspath(__file__))) 
+
+
 import gc
+
 
 
 reps = 10
@@ -46,9 +54,11 @@ beliefs = [{3: 0.5, 56: 0.5, 43: 0.5},
 gc.enable()
 for rep in range(reps):
 
-
-    print('\n\n\n\n\n\n\n\n ---------- REPETITION #' + str(rep) + ' -------------- \n\n\n\n\n\n\n\n\n')
-
+    
+    
+    print('\n\n\n\n\n ---------- REPETITION #' + str(rep) + ' -------------- \n\n\n\n\n\n')
+    
+    
 
     check = Checkworthy(
         agg_interval = config['agg_interval'],
@@ -91,7 +101,9 @@ for rep in range(reps):
     Run 1: pre-period
     '''
 
-    print('\n\n\n\n ---- Run 1: pre-period ------ \n\n\n\n')
+    
+    print('\n\n\n ---- Run 1: pre-period ------ \n\n\n')
+    
 
     sim.run(
         period = 'pre',
@@ -114,7 +126,9 @@ for rep in range(reps):
     Run 2: Post-period, no intervention
     '''
 
-    print('\n\n\n\n ---- Run 2: Post-period, no intervention ------ \n\n\n\n')
+    
+    print('\n\n\n ---- Run 2: Post-period, no intervention ------ \n\n\n')
+
 
 
 
@@ -141,7 +155,9 @@ for rep in range(reps):
     Run 3: Post-period, checkworthy intervention, label = random
     '''
 
-    print('\n\n\n\n ---- Run 3: Post-period, checkworthy intervention, label = random ------ \n\n\n\n')
+    
+    print('\n\n\n ---- Run 3: Post-period, checkworthy intervention, label = random ------ \n\n\n')
+
 
 
     with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
@@ -151,13 +167,15 @@ for rep in range(reps):
 
     check_pre = sim.return_check()
 
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n')
     check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
-
-    print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'random')
+    
+    print('\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n')
 
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
     check_pre.train_model(label_to_use='average_truth_perception_random')
 
     sim.set_check(check=check_pre)
@@ -179,7 +197,9 @@ for rep in range(reps):
     Run 4: Post-period, checkworthy intervention, label = knowledgable community
     '''
 
-    print('\n\n\n\n ---- Run 4: Post-period, checkworthy intervention, label = knowledgable community ------ \n\n\n\n')
+    
+    print('\n\n\n ---- Run 4: Post-period, checkworthy intervention, label = knowledgable community ------ \n\n\n')
+
 
 
     with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
@@ -189,13 +209,15 @@ for rep in range(reps):
 
     check_pre = sim.return_check()
 
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
-
-    print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'knowledgable_community')
+    
+    print('\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n')
 
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
     check_pre.train_model(label_to_use='average_truth_perception_knowledgable_community')
 
     sim.set_check(check=check_pre)
@@ -218,6 +240,7 @@ for rep in range(reps):
     Run 5: Post-period, checkworthy intervention, label = stratified
     '''
 
+
     print('\n\n\n\n ---- Run 5: Post-period, checkworthy intervention, label = stratified ------ \n\n\n\n')
 
 
@@ -228,13 +251,15 @@ for rep in range(reps):
 
     check_pre = sim.return_check()
 
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
-
-    print('\n\n\n\n\n ----------- Stratified Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    
+    print('\n\n\n ----------- Stratified Sampling of Labels for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'stratified')
+    
+    print('\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n')
 
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
     check_pre.train_model(label_to_use='average_truth_perception_stratified')
 
     sim.set_check(check=check_pre)

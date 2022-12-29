@@ -12,6 +12,7 @@ data/
 *.edgelist
 *.gpickle
 *.gexf
+*.csv
 
 .DS_Store
 

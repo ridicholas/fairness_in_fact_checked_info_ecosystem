@@ -18,7 +18,7 @@
     - 4
     - 6
   min_degree: 5
-  fact_checks_per_step: 10
+  fact_checks_per_step: 20
   claims_to_sample: 500
   nodes_to_sample: 100
   post_duration: 3
