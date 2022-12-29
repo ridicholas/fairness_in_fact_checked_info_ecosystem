@@ -4,7 +4,7 @@
     - 3
     - 56
     - 43
-  learning_rate: 0.25
+  learning_rate: 0.2
   num_claims: 6000 #this is number of claims per topic per timestep
   runtime: 200
   agg_interval: 3
@@ -14,9 +14,9 @@
   load_data: True
   update_beliefs: True
   depths:
-    - 1
     - 2
-    - 3
+    - 4
+    - 6
   min_degree: 5
   fact_checks_per_step: 20
   claims_to_sample: 500

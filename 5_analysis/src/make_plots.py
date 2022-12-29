@@ -11,7 +11,7 @@ from plotnine import *
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
-
+'''
 def plot_total_reads_over_time(midpoint, mitigation, file, by_community=False,specific_topic=None, smooth_interval = 25):
     
     colors = {'anti-misinfo':'blue', 'noise':'black', 'misinfo':'darkred'}  
@@ -80,49 +80,154 @@ def plot_total_reads_over_time(midpoint, mitigation, file, by_community=False,sp
     
     return 'Finished Making Plots!'
 
-def make_community_sentiment_plot(inpath_none, inpath_mit, mitigation, midpoint, file, smooth_interval):
-    community_sentiment_none = pd.read_csv(inpath_none)
-    community_sentiment_none['Mitigation'] = 'None'
-    community_sentiment_mit = pd.read_csv(inpath_mit)
-    community_sentiment_mit['Mitigation'] = str(mitigation)
+'''
+
+def plot_total_misinfo_reads_over_time(midpoint, smooth_interval = 25):
     
-    community_sentiment = pd.concat([community_sentiment_none, community_sentiment_mit])
-    community_sentiment = community_sentiment.sort_values(by=['Mitigation', 'Community', 'Topic', 'Time'])
-    community_sentiment['Mean Sentiment (smooth)'] = community_sentiment.groupby(['Community','Topic','Mitigation'])['Mean Sentiment'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
-    community_sentiment = community_sentiment.reset_index()
+    
+    
+    colors = {'Community Stratified Label':'blue', 'No Intervention':'black', 'Random Label':'darkred', 'Knowledgeable Community Label':'orange'}  
+
+    reads_over_time = pd.read_pickle('../output/exp_results_information_read_aggregated.pickle')
+    reads_over_time = reads_over_time.sort_values(by=['Community', 'Topic', 'Type', 'Intervention', 'Step'])
+    reads_over_time['Intervention'] = np.where(reads_over_time['Intervention'] == 'no_intervention', 'No Intervention',
+                                               np.where(reads_over_time['Intervention']=='intervention_kc_label', 'Knowledgeable Community Label',
+                                                        np.where(reads_over_time['Intervention']=='intervention_random_label', 'Random Label', 'Community Stratified Label')))
+    
+    
+    reads_over_time['Topic'] = 'Topic ' + reads_over_time['Topic'].astype(int).apply(str)
+    reads_over_time['Community'] = 'Community ' + reads_over_time['Community'].astype(int).apply(str)
+
+    
+    reads_over_time_mean = reads_over_time.groupby(by=['Community', 'Topic', 'Type', 'Intervention', 'Step']).\
+        agg(mean_reads=pd.NamedAgg(column='Reads', aggfunc='mean')).reset_index()
+    
+    reads_over_time_mean['Reads (moving average)'] = reads_over_time_mean.groupby(['Type','Community','Intervention', 'Topic'])['mean_reads'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+
+    
+    # 1. Community + Topic Breakdown of Misinfo read across trials.
+    reads_over_time_misinfo = reads_over_time_mean\
+        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]
+
+
+    plt=(ggplot(reads_over_time_misinfo, aes(x='Step',y='Reads (moving average)', color = 'Intervention'))
+                 + geom_line()
+                 + facet_wrap('~ Community + Topic')
+                 + ggtitle('Misinformation Read By Community')
+                 + scale_color_manual(values=colors)
+                 + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
+
+    output = '../output/misinfo_reads_results.png'
+    plt.save(filename=output, width=16,height=6)
+    
+    # 2. Topic Breakdown of Misinfo read across trials.
+
+    reads_over_time_topic = reads_over_time_mean\
+        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]\
+            .groupby(['Intervention', 'Topic', 'Step'])\
+                .agg(Reads=pd.NamedAgg(column='Reads (moving average)', aggfunc='mean')).reset_index()
+    
+    plt=(ggplot(reads_over_time_topic, aes(x='Step',y='Reads', color = 'Intervention'))
+                 + geom_line()
+                 + facet_wrap('Topic')
+                 + ggtitle('Misinformation Read By Topic')
+                 + scale_color_manual(values=colors)
+                 + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
+
+    output = '../output/misinfo_reads_topic_results.png'
+    plt.save(filename=output, width=10,height=6)
+
+
+    #3. Community Breakdown of Misinfo read across trials
+    reads_over_time_comm = reads_over_time_mean\
+        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]\
+            .groupby(['Intervention', 'Community', 'Step'])\
+                .agg(Reads=pd.NamedAgg(column='Reads (moving average)', aggfunc='mean')).reset_index()
+    
+    plt=(ggplot(reads_over_time_comm, aes(x='Step',y='Reads', color = 'Intervention'))
+                 + geom_line()
+                 + facet_wrap('Community')
+                 + ggtitle('Misinformation Read By Community')
+                 + scale_color_manual(values=colors)
+                 + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
+
+    output = '../output/misinfo_reads_comm_results.png'
+    plt.save(filename=output, width=16,height=6)
+
+
+
+
+
+def make_community_sentiment_plot(midpoint, smooth_interval = 25):
+    
+    
+    colors = {'Community Stratified Label':'blue', 'No Intervention':'black', 'Random Label':'darkred', 'Knowledgeable Community Label':'orange'}  
+
+    community_sentiment = pd.read_csv('../output/exp_results_community_belief.csv')
+    community_sentiment['Intervention'] = np.where(community_sentiment['Intervention'] == 'no_intervention', 'No Intervention',
+                                               np.where(community_sentiment['Intervention']=='intervention_kc_label', 'Knowledgeable Community Label',
+                                                        np.where(community_sentiment['Intervention']=='intervention_random_label', 'Random Label', 'Community Stratified Label')))
     community_sentiment['Topic'] = 'Topic ' + community_sentiment['Topic'].astype(int).apply(str)
     community_sentiment['Community'] = 'Community ' + community_sentiment['Community'].astype(int).apply(str)
     
+    community_sentiment_mean = community_sentiment.groupby(by=['Community', 'Topic', 'Intervention', 'Time']).\
+        agg(mean_belief=pd.NamedAgg(column='Mean Belief', aggfunc='mean')).reset_index()
+    
+    community_sentiment_mean['Mean Belief (moving average)'] = community_sentiment_mean.groupby(['Community','Intervention', 'Topic'])['mean_belief'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+
     
     
     
-    plt=(ggplot(community_sentiment,
-                aes(x='Time',y='Mean Sentiment (smooth)', color = 'Topic', linetype = 'Mitigation'))
+    # 1. By Topic and Community
+    plt=(ggplot(community_sentiment_mean,
+                aes(x='Time',y='Mean Belief (moving average)', color = 'Intervention'))
          + geom_line(alpha = 0.8)
-         + facet_wrap('Community')
-         + ggtitle('Mean Belief for Communties by Topic')
+         + facet_wrap('~ Community + Topic', scales = 'free_y')
+         + ggtitle('Mean Belief by Communties and Topic')
          + ylab('Mean Belief')
+         + scale_color_manual(values = colors)
          + geom_vline(aes(xintercept = midpoint), colour = 'green', linetype= 'dashed'))
 
-    plt.save(filename='../output/{}/mean_sentiment_by_community.png'.format(file), width = 10, height = 7)
-
-if not os.path.isdir('../../4_simulation/output/mitigation-none'):
-    print('Need to first run with no mitigation!!')
-else:
-    midpoint = 200
-    file = 'mitigation-stop_reading_misinfo-labelmethod-average_truth_perception_random-sample_method-top_avg_origin_degree'
-    inpath_community_sentiment_none = '../output/mitigation-none/community_sentiment_clean.csv'
-    inpath_community_sentiment_mit = '../output/{}/community_sentiment_clean.csv'.format(file)
-    mitigation = 'Stop Reading'
-    plot_total_reads_over_time(by_community=True, specific_topic=0, file = file, mitigation = mitigation, midpoint = midpoint)
-    plot_total_reads_over_time(by_community=True, specific_topic=1, file = file, mitigation = mitigation, midpoint = midpoint)
-    plot_total_reads_over_time(by_community=True, specific_topic=2, file = file, mitigation = mitigation, midpoint = midpoint)
-    plot_total_reads_over_time(by_community=True, specific_topic=3, file = file, mitigation = mitigation, midpoint = midpoint)
-    make_community_sentiment_plot(inpath_none =  inpath_community_sentiment_none, 
-                                  inpath_mit = inpath_community_sentiment_mit,
-                                  midpoint = midpoint,
-                                  mitigation = mitigation,
-                                  file=file,
-                                  smooth_interval=25)
+    plt.save(filename='../output/mean_belief_results.png', width = 16, height = 6)
 
 
+    #2. By Community
+    
+    
+    community_sentiment_mean_comm = community_sentiment_mean\
+            .groupby(['Intervention', 'Community', 'Time'])\
+                .agg(Mean_Belief=pd.NamedAgg(column='Mean Belief (moving average)', aggfunc='mean')).reset_index()
+
+    
+    
+    plt=(ggplot(community_sentiment_mean_comm,
+                aes(x='Time',y='Mean_Belief', color = 'Intervention'))
+         + geom_line(alpha = 0.8)
+         + facet_wrap('~ Community', scales = 'free_y')
+         + ggtitle('Mean Belief Across All Topics by Community')
+         + ylab('Mean Belief')
+         + scale_color_manual(values = colors)
+         + geom_vline(aes(xintercept = midpoint), colour = 'green', linetype= 'dashed'))
+
+    plt.save(filename='../output/mean_belief_results_by_community.png', width = 16, height = 6)
+
+    #4. Community + Topic for one intervention
+
+    community_sentiment_raw = community_sentiment[community_sentiment['Intervention']=='No Intervention']
+
+    community_sentiment_mean = community_sentiment_raw.groupby(by=['Community', 'Topic', 'Intervention', 'Time']).\
+            agg(mean_belief=pd.NamedAgg(column='Mean Belief', aggfunc='mean')).reset_index()
+
+    community_sentiment_mean['Mean Belief (moving average)'] = community_sentiment_mean.groupby(['Community','Intervention', 'Topic'])['mean_belief'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+
+    plt=(ggplot(community_sentiment_mean, aes(x='Time',y='Mean Belief (moving average)', color = 'Topic'))
+             + geom_line()
+             + facet_wrap('Community')
+             + ggtitle('Change in Belief w/ No Intervention\nBy Community + Topic')
+             + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
+
+    plt.save(filename='../output/mean_belief_no_intervention.png', width = 12, height = 6)
+
+
+plot_total_misinfo_reads_over_time(midpoint = 200)
+make_community_sentiment_plot(midpoint = 200)
