@@ -18,8 +18,4 @@ nohup python3 -u main.py -p 'post' -m 'stop_reading_misinfo' -l 'stratified' -s 
 nohup python3 -u main.py -p 'post' -m 'stop_reading_misinfo' -l 'knowledgable_community' -s 'stratified_nodes_visited' > post_know_strat.out & 
 
 
-'''
-cd ../../5_analysis/src
-python3 process_data.py
-python3 make_plots.py
-'''
+
