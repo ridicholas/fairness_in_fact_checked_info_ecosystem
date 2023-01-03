@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 #making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+
+
+
+
 def subset_graph(G, outpath, communities=None):
     """
     If communities is not None, only return graph of nodes in communities subset.

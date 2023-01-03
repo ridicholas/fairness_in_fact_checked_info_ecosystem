@@ -22,9 +22,10 @@
   claims_to_sample: 500
   nodes_to_sample: 100
   post_duration: 3
-  mitigation_method: 'stop_reading_misinfo'
-  label_to_use: 'average_truth_perception_random'
-  sample_method: 'stratified_nodes_visited'
+  
+  #mitigation_method: 'stop_reading_misinfo'
+  #label_to_use: 'average_truth_perception_random'
+  #sample_method: 'stratified_nodes_visited'
   raw_network_path: '../../data/nodes_with_community.gpickle'
   ready_network_path: '../output/simulation_net.gpickle'
   output_sim_midpoint: '../output/simulation_pre_period'

@@ -470,6 +470,17 @@ class TopicSim():
         return claim
 
 
+    def random_community_subset(community_graph, outpath, min_network_size=50000, max_network_size=200000):
+        """
+        Select a random subset of communities such that total number of nodes is between min and max network size.
+        """
+
+        communities = []
+        all_communities = community_graph.nodes(data=True)
+        currsize = 0
+
+        print('done')
+
     def subset_graph(G, communities=None):
         """
         If communities is not None, only return graph of nodes in communities subset.
