@@ -474,12 +474,23 @@ class TopicSim():
         """
         Select a random subset of communities such that total number of nodes is between min and max network size.
         """
+        import networkx as nx
+        from random import sample
 
         communities = []
-        all_communities = community_graph.nodes(data=True)
-        currsize = 0
+        community_sizes = pd.Series(nx.get_node_attributes(community_graph, 'SIZE'))
+        community_sizes = community_sizes[community_sizes >= 10000]
+        num_network_nodes = 0
 
-        print('done')
+        while num_network_nodes < min_network_size and len(communities) < 2:
+            community = sample(list(community_sizes.index), 1)[0]
+        
+            if community_sizes[communities + [community]].sum() < max_network_size:
+                communities.append(community)
+                num_network_nodes += community_sizes[community]
+        
+
+        return communities
 
     def subset_graph(G, communities=None):
         """
@@ -575,7 +586,7 @@ class TopicSim():
         G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
         G.remove_nodes_from(list(nx.isolates(G)))
 
-        bb = nx.betweenness_centrality(G)
+        bb = nx.betweenness_centrality(G, k=int(0.1*len(list(G.nodes()))))
         degrees = dict(G.in_degree())
         nx.set_node_attributes(G, bb, "centrality")
         nx.set_node_attributes(G, degrees, "degree")
