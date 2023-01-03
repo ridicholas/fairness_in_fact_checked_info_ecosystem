@@ -46,6 +46,9 @@ class TopicSim():
 
     def return_check(self):
         return self.check
+    
+    def return_communities(self):
+        return self.communities
 
     def set_post_duration(self, post_duration):
         self.post_duration = post_duration
@@ -72,7 +75,7 @@ class TopicSim():
 
 
 
-    def run(self, period, learning_rate, fact_checks_per_step, mitigation_type):
+    def run(self, period, learning_rate, min_degree, fact_checks_per_step, mitigation_type):
 
 
         G = self.G
@@ -175,10 +178,11 @@ class TopicSim():
                                     update checkworthy data
                                     '''
                                     check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = claim)
-                                    if claim_id not in check.checkworthy_data.keys():
-                                        check.update_keys()
-                                    else:
-                                        check.update_agg_values()
+                                    if data['degree'] >= min_degree:
+                                        if claim_id not in check.checkworthy_data.keys():
+                                            check.update_keys()
+                                        else:
+                                            check.update_agg_values()
 
                             else:
                                 all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
@@ -187,10 +191,11 @@ class TopicSim():
                                 update checkworthy data
                                 '''
                                 check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = claim)
-                                if claim_id not in check.checkworthy_data.keys():
-                                    check.update_keys()
-                                else:
-                                    check.update_agg_values()
+                                if data['degree'] >= min_degree:
+                                    if claim_id not in check.checkworthy_data.keys():
+                                        check.update_keys()
+                                    else:
+                                        check.update_agg_values()
 
 
                     '''
@@ -251,7 +256,12 @@ class TopicSim():
                                             origin_node = read_tweet.split('-')[2]
                                             claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
                                             check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-                                            check.update_time_values(time_feature=time_feature, origin_node=origin_node)
+                                            if data['degree'] >= min_degree:
+
+                                                if claim_id not in check.checkworthy_data.keys():
+                                                    check.update_keys()
+                                                else:
+                                                    check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
                                         community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                                 topic = topic,
@@ -291,7 +301,11 @@ class TopicSim():
                                         origin_node = read_tweet.split('-')[2]
                                         claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
                                         check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-                                        check.update_time_values(time_feature=time_feature, origin_node=origin_node)
+                                        if data['degree'] >= min_degree:
+                                            if claim_id not in check.checkworthy_data.keys():
+                                                check.update_keys()
+                                            else:
+                                                check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
                                     community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                             topic = topic,
@@ -336,7 +350,7 @@ class TopicSim():
             self.all_claims = 'Removed for light storage'
         
         # These objects are used in process_data.py
-        check.set_network(G=G)
+        check.set_network(G=G, communities=self.communities)
         self.G = G
         self.check = check
         self.community_sentiment_through_time = community_sentiment_through_time

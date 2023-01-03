@@ -92,7 +92,7 @@ for rep in range(reps):
         )
 
     # Pass network to Checkworthy object
-    check.set_network(G = sim.return_network())
+    check.set_network(G = sim.return_network(), communities=sim.return_communities())
     # reset checkworthy object object
     sim.set_check(check = check)
 
@@ -108,6 +108,7 @@ for rep in range(reps):
     sim.run(
         period = 'pre',
         learning_rate = config['learning_rate'],
+        min_degree=config['min_degree'],
         fact_checks_per_step = config['fact_checks_per_step'],
         mitigation_type = 'None'
     )
@@ -140,6 +141,7 @@ for rep in range(reps):
     sim.run(
         period = 'post',
         learning_rate = config['learning_rate'],
+        min_degree=config['min_degree'],
         fact_checks_per_step = config['fact_checks_per_step'],
         mitigation_type = 'None'
     )
@@ -169,7 +171,7 @@ for rep in range(reps):
 
     
     print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method=config['sample_method'])
     
     print('\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'random')
@@ -183,6 +185,7 @@ for rep in range(reps):
     sim.run(
         period = 'post',
         learning_rate = config['learning_rate'],
+        min_degree=config['min_degree'],
         fact_checks_per_step = config['fact_checks_per_step'],
         mitigation_type = 'stop_reading_misinfo'
     )
@@ -211,7 +214,7 @@ for rep in range(reps):
 
     
     print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method=config['sample_method'])
     
     print('\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'knowledgable_community')
@@ -225,6 +228,7 @@ for rep in range(reps):
     sim.run(
         period = 'post',
         learning_rate = config['learning_rate'],
+        min_degree=config['min_degree'],
         fact_checks_per_step = config['fact_checks_per_step'],
         mitigation_type = 'stop_reading_misinfo'
     )
@@ -251,9 +255,8 @@ for rep in range(reps):
 
     check_pre = sim.return_check()
 
-    
     print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method=config['sample_method'])
     
     print('\n\n\n ----------- Stratified Sampling of Labels for Checkworthy Dataset --------- \n\n\n')
     check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'stratified')
@@ -267,6 +270,7 @@ for rep in range(reps):
     sim.run(
         period = 'post',
         learning_rate = config['learning_rate'],
+        min_degree=config['min_degree'],
         fact_checks_per_step = config['fact_checks_per_step'],
         mitigation_type = 'stop_reading_misinfo'
     )
