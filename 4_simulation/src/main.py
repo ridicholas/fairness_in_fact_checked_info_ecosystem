@@ -169,7 +169,7 @@ def main(argv):
                     mitigation_type = mitigation_method
                 )
 
-                with open(config['output_sim_final_intervention_random'] + str(rep) + '.pickle', 'wb') as file:
+                with open(config['../output/simulation_final_intervention_{}_{}'.format(label_method, sample_method)] + str(rep) + '.pickle', 'wb') as file:
                     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
                 del sim

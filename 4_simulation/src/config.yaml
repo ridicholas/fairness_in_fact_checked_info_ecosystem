@@ -30,6 +30,5 @@
   ready_network_path: '../output/simulation_net.gpickle'
   output_sim_midpoint: '../output/simulation_pre_period'
   output_sim_final_no_intervention: '../output/simulation_final_no_intervention'
-  output_sim_final_intervention_random: '../output/simulation_final_intervention_random_label'
-  output_sim_final_intervention_kc: '../output/simulation_final_intervention_kc_label'
-  output_sim_final_intervention_stratified: '../output/simulation_final_intervention_stratified_label'
+
+
