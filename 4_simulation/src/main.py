@@ -27,13 +27,10 @@ def main(argv):
             period = arg
     
 
-    reps = 2
+    reps = 10
 
     
-    period='post'
-    mitigation_method = 'stop_reading_misinfo'
-    sample_method = 'stratified_nodes_visited'
-    label_method = 'stratified'
+    
     
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
