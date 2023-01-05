@@ -1,10 +1,11 @@
 from checkworthy import Checkworthy
-from TopicSim import TopicSim
+from TopicSim import TopicSim, random_community_sample, make_comm_string
 import yaml
 import pickle
 import gc
 import os
 import sys, getopt
+import networkx as nx
 
 #making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__))) 
@@ -26,23 +27,55 @@ def main(argv):
             period = arg
     
 
-    reps = 10
+    reps = 2
 
-
+    
+    period='post'
+    mitigation_method = 'stop_reading_misinfo'
+    sample_method = 'stratified_nodes_visited'
+    label_method = 'stratified'
+    
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
+    
 
-
+    
     '''
     First topic (row) impacts every group the same, the other topics each impact
     one group significantly more than the others
     '''
 
+    if config['random_communities'] and period=='pre':
+        
+        
+        communities = random_community_sample(nx.read_gexf(config['community_graph_path']))
+            
+        
+        config['communities'] = communities
+        with open('config.yaml', 'w') as file:
+            file.write(yaml.dump(config, default_flow_style=False))
 
-    impactednesses = [{3: 0.5, 56: 0.5, 43: 0.5},
-                    {3: 0.8, 56: 0.3, 43: 0.3},
-                    {3: 0.3, 56: 0.8, 43: 0.3},
-                    {3: 0.3, 56: 0.3, 43: 0.8}]
+
+    else:
+        communities = config['communities']
+    
+    num_topics = len(communities) + 1
+
+
+
+    
+    
+
+    impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+
+    for i in range(1, len(impactednesses)):
+        keys = list(impactednesses[i].keys())
+        for key in impactednesses[i].keys():
+            if key == keys[i-1]:
+                impactednesses[i][key] = config['high_impactedness']
+            else:
+                impactednesses[i][key] = config['low_impactedness']
+
 
     '''
     For the first topic (which everyone cares about equally), belief is roughly average (50%).
@@ -50,12 +83,20 @@ def main(argv):
     average belief is lower, indicating that they have more knowledge of the truth than the
     other communities that are not impacted  by the topic.
     '''
-    beliefs = [{3: 0.5, 56: 0.5, 43: 0.5},
-            {3: 0.5, 56: 0.5, 43: 0.5},
-            {3: 0.5, 56: 0.5, 43: 0.5},
-            {3: 0.5, 56: 0.5, 43: 0.5}]
+
+    beliefs = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+
+    for i in range(1, len(beliefs)):
+        keys = list(beliefs[i].keys())
+        for key in beliefs[i].keys():
+            if key == keys[i-1]:
+                beliefs[i][key] = config['low_belief']
+            else:
+                beliefs[i][key] = config['high_belief']
 
     gc.enable()
+
+    
 
     for rep in range(reps):
 
@@ -73,9 +114,9 @@ def main(argv):
             sim = TopicSim(
                 impactedness = impactednesses,
                 beliefs = beliefs,
-                num_topics = config['num_topics'],
+                num_topics = num_topics,
                 runtime = config['runtime'],
-                communities = config['communities'],
+                communities = communities,
                 num_claims = config['num_claims']
             )
 
@@ -84,14 +125,24 @@ def main(argv):
             If create, nodes in network must already have 'Community' attribute
             '''
 
-            if config['load_data']:
+            if config['load_data'] and not(config['random_communities']): 
                 sim.load_simulation_network(ready_network_path = config['ready_network_path'])
-            else:
+            elif rep==0: #no need to recreate network on subsequent reps
                 sim.create_simulation_network(
                     raw_network_path = config['raw_network_path'],
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
                     perc_bots = config['perc_bots']
                 )
+
+                start_network_path = sim.start_network_path
+
+
+            else: #load network that was created in first rep
+                sim.load_simulation_network(ready_network_path = start_network_path)
+                
+
+                
+
 
             # Pass network to Checkworthy object
             check.set_network(G = sim.return_network(), communities=sim.return_communities())
@@ -108,7 +159,7 @@ def main(argv):
             )
 
 
-            with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'wb') as file:
+            with open(config['output_sim_midpoint'] + '_run' + str(rep) + '_communities' + sim.comm_string + '.pickle', 'wb') as file:
                 pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -120,7 +171,7 @@ def main(argv):
 
             if mitigation_method=='None':
 
-                with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+                with open(config['output_sim_midpoint'] + '_run' + str(rep) + '_communities' + make_comm_string(communities) + '.pickle', 'rb') as file:
                     sim = pickle.load(file)
 
                 sim.set_post_duration(config['post_duration'])
@@ -133,7 +184,7 @@ def main(argv):
                     mitigation_type = 'None'
                 )
 
-                with open(config['output_sim_final_no_intervention'] + str(rep) + '.pickle', 'wb') as file:
+                with open(config['output_sim_final_no_intervention'] + '_run' + str(rep) + '_communities' + sim.comm_string + '.pickle', 'wb') as file:
                     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
                 del sim
@@ -141,7 +192,7 @@ def main(argv):
 
             else:
 
-                with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+                with open(config['output_sim_midpoint'] + '_run' + str(rep) + '_communities' + make_comm_string(communities) + '.pickle', 'rb') as file:
                     sim = pickle.load(file)
 
                 sim.set_post_duration(config['post_duration'])
@@ -169,7 +220,8 @@ def main(argv):
                     mitigation_type = mitigation_method
                 )
 
-                with open(config['../output/simulation_final_intervention_{}_{}'.format(label_method, sample_method)] + str(rep) + '.pickle', 'wb') as file:
+                with open('../output/simulation_final_intervention_{}_{}'.format(label_method, sample_method) + '_run' + \
+                    str(rep) +  '_communities' + sim.comm_string + '.pickle', 'wb') as file:
                     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
                 del sim

@@ -1,34 +1,35 @@
----
-  num_topics: 4
-  communities:
-    - 3
-    - 56
-    - 43
-  learning_rate: 0.2
-  num_claims: 6000 #this is number of claims per topic per timestep
-  runtime: 200
-  agg_interval: 3
-  agg_steps: 3
-  perc_nodes_to_subset: 0.1
-  perc_bots: 0.1
-  load_data: True
-  update_beliefs: True
-  depths:
-    - 2
-    - 4
-    - 6
-  min_degree: 5
-  fact_checks_per_step: 20
-  claims_to_sample: 500
-  nodes_to_sample: 100
-  post_duration: 3
-  
-  #mitigation_method: 'stop_reading_misinfo'
-  #label_to_use: 'average_truth_perception_random'
-  #sample_method: 'stratified_nodes_visited'
-  raw_network_path: '../../data/nodes_with_community.gpickle'
-  ready_network_path: '../output/simulation_net.gpickle'
-  output_sim_midpoint: '../output/simulation_pre_period'
-  output_sim_final_no_intervention: '../output/simulation_final_no_intervention'
-
-
+agg_interval: 3
+agg_steps: 3
+claims_to_sample: 500
+communities:
+- 28
+- 120
+- 34
+- 127
+- 49
+- 55
+community_graph_path: ../../data/community_net.gexf
+depths:
+- 2
+- 4
+- 6
+fact_checks_per_step: 20
+high_belief: 0.8
+high_impactedness: 0.8
+learning_rate: 0.2
+load_data: true
+low_belief: 0.3
+low_impactedness: 0.3
+min_degree: 1
+nodes_to_sample: 100
+num_claims: 600
+output_sim_final_no_intervention: ../output/simulation_final_no_intervention
+output_sim_midpoint: ../output/simulation_pre_period
+perc_bots: 0.1
+perc_nodes_to_subset: 0.1
+post_duration: 3
+random_communities: true
+raw_network_path: ../../data/nodes_with_community.gpickle
+ready_network_path: ../output/simulation_net_communities_55_56_49.gpickle
+runtime: 200
+update_beliefs: true
