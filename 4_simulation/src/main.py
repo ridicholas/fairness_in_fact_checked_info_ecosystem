@@ -13,7 +13,7 @@ import pickle
 import gc
 
 
-reps = 10
+reps = 1
 
 
 with open('config.yaml', 'r') as file:
@@ -38,10 +38,10 @@ For the other topics, if a community is more impacted by a topic, we assume that
 average belief is lower, indicating that they have more knowledge of the truth than the
 other communities that are not impacted  by the topic.
 '''
-beliefs = [{3: 0.5, 56: 0.5, 43: 0.5},
-           {3: 0.3, 56: 0.8, 43: 0.8},
-           {3: 0.8, 56: 0.3, 43: 0.8},
-           {3: 0.8, 56: 0.8, 43: 0.3}]
+beliefs = [{3: 0.55, 56: 0.55, 43: 0.55},
+           {3: 0.45, 56: 0.55, 43: 0.55},
+           {3: 0.55, 56: 0.45, 43: 0.55},
+           {3: 0.55, 56: 0.55, 43: 0.45}]
 
 gc.enable()
 for rep in range(reps):
@@ -80,6 +80,10 @@ for rep in range(reps):
             perc_nodes_to_subset = config['perc_nodes_to_subset'],
             perc_bots = config['perc_bots']
         )
+        
+        sim.save_simulation_network(ready_network_path = config['ready_network_path'])
+        
+        
 
     # Pass network to Checkworthy object
     check.set_network(G = sim.return_network())
@@ -118,136 +122,136 @@ for rep in range(reps):
 
 
 
-    with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
-        sim = pickle.load(file)
+    # with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+    #     sim = pickle.load(file)
 
-    sim.set_post_duration(config['post_duration'])
+    # sim.set_post_duration(config['post_duration'])
 
-    sim.run(
-        period = 'post',
-        learning_rate = config['learning_rate'],
-        fact_checks_per_step = config['fact_checks_per_step'],
-        mitigation_type = 'None'
-    )
+    # sim.run(
+    #     period = 'post',
+    #     learning_rate = config['learning_rate'],
+    #     fact_checks_per_step = config['fact_checks_per_step'],
+    #     mitigation_type = 'None'
+    # )
 
-    with open(config['output_sim_final_no_intervention'] + str(rep) + '.pickle', 'wb') as file:
-        pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(config['output_sim_final_no_intervention'] + str(rep) + '.pickle', 'wb') as file:
+    #     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    del sim
-    gc.collect()
-
-
-    '''
-    Run 3: Post-period, checkworthy intervention, label = random
-    '''
-
-    print('\n\n\n\n ---- Run 3: Post-period, checkworthy intervention, label = random ------ \n\n\n\n')
+    # del sim
+    # gc.collect()
 
 
-    with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
-        sim = pickle.load(file)
+    # '''
+    # Run 3: Post-period, checkworthy intervention, label = random
+    # '''
 
-    sim.set_post_duration(config['post_duration'])
-
-    check_pre = sim.return_check()
-
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
-
-    print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'random')
-
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
-    check_pre.train_model(label_to_use='average_truth_perception_random')
-
-    sim.set_check(check=check_pre)
-
-    sim.run(
-        period = 'post',
-        learning_rate = config['learning_rate'],
-        fact_checks_per_step = config['fact_checks_per_step'],
-        mitigation_type = 'stop_reading_misinfo'
-    )
-
-    with open(config['output_sim_final_intervention_random'] + str(rep) + '.pickle', 'wb') as file:
-        pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-    del sim
-    gc.collect()
-
-    '''
-    Run 4: Post-period, checkworthy intervention, label = knowledgable community
-    '''
-
-    print('\n\n\n\n ---- Run 4: Post-period, checkworthy intervention, label = knowledgable community ------ \n\n\n\n')
+    # print('\n\n\n\n ---- Run 3: Post-period, checkworthy intervention, label = random ------ \n\n\n\n')
 
 
-    with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
-        sim = pickle.load(file)
+    # with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+    #     sim = pickle.load(file)
 
-    sim.set_post_duration(config['post_duration'])
+    # sim.set_post_duration(config['post_duration'])
 
-    check_pre = sim.return_check()
+    # check_pre = sim.return_check()
 
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+    # print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
 
-    print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'knowledgable_community')
+    # print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'random')
 
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
-    check_pre.train_model(label_to_use='average_truth_perception_knowledgable_community')
+    # print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
+    # check_pre.train_model(label_to_use='average_truth_perception_random')
 
-    sim.set_check(check=check_pre)
+    # sim.set_check(check=check_pre)
 
-    sim.run(
-        period = 'post',
-        learning_rate = config['learning_rate'],
-        fact_checks_per_step = config['fact_checks_per_step'],
-        mitigation_type = 'stop_reading_misinfo'
-    )
+    # sim.run(
+    #     period = 'post',
+    #     learning_rate = config['learning_rate'],
+    #     fact_checks_per_step = config['fact_checks_per_step'],
+    #     mitigation_type = 'stop_reading_misinfo'
+    # )
 
-    with open(config['output_sim_final_intervention_kc'] + str(rep) + '.pickle', 'wb') as file:
-        pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(config['output_sim_final_intervention_random'] + str(rep) + '.pickle', 'wb') as file:
+    #     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    del sim
-    gc.collect()
+    # del sim
+    # gc.collect()
+
+    # '''
+    # Run 4: Post-period, checkworthy intervention, label = knowledgable community
+    # '''
+
+    # print('\n\n\n\n ---- Run 4: Post-period, checkworthy intervention, label = knowledgable community ------ \n\n\n\n')
 
 
-    '''
-    Run 5: Post-period, checkworthy intervention, label = stratified
-    '''
+    # with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+    #     sim = pickle.load(file)
 
-    print('\n\n\n\n ---- Run 5: Post-period, checkworthy intervention, label = stratified ------ \n\n\n\n')
+    # sim.set_post_duration(config['post_duration'])
+
+    # check_pre = sim.return_check()
+
+    # print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+
+    # print('\n\n\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'knowledgable_community')
+
+    # print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
+    # check_pre.train_model(label_to_use='average_truth_perception_knowledgable_community')
+
+    # sim.set_check(check=check_pre)
+
+    # sim.run(
+    #     period = 'post',
+    #     learning_rate = config['learning_rate'],
+    #     fact_checks_per_step = config['fact_checks_per_step'],
+    #     mitigation_type = 'stop_reading_misinfo'
+    # )
+
+    # with open(config['output_sim_final_intervention_kc'] + str(rep) + '.pickle', 'wb') as file:
+    #     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # del sim
+    # gc.collect()
 
 
-    with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
-        sim = pickle.load(file)
+    # '''
+    # Run 5: Post-period, checkworthy intervention, label = stratified
+    # '''
 
-    sim.set_post_duration(config['post_duration'])
+    # print('\n\n\n\n ---- Run 5: Post-period, checkworthy intervention, label = stratified ------ \n\n\n\n')
 
-    check_pre = sim.return_check()
 
-    print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
+    # with open(config['output_sim_midpoint'] + str(rep) + '.pickle', 'rb') as file:
+    #     sim = pickle.load(file)
 
-    print('\n\n\n\n\n ----------- Stratified Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
-    check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'stratified')
+    # sim.set_post_duration(config['post_duration'])
 
-    print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
-    check_pre.train_model(label_to_use='average_truth_perception_stratified')
+    # check_pre = sim.return_check()
 
-    sim.set_check(check=check_pre)
+    # print('\n\n\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method='top_avg_origin_degree')
 
-    sim.run(
-        period = 'post',
-        learning_rate = config['learning_rate'],
-        fact_checks_per_step = config['fact_checks_per_step'],
-        mitigation_type = 'stop_reading_misinfo'
-    )
+    # print('\n\n\n\n\n ----------- Stratified Sampling of Labels for Checkworthy Dataset --------- \n\n\n\n\n')
+    # check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = 'stratified')
 
-    with open(config['output_sim_final_intervention_stratified'] + str(rep) + '.pickle', 'wb') as file:
-        pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
+    # print('\n\n\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n\n\n\n')
+    # check_pre.train_model(label_to_use='average_truth_perception_stratified')
 
-    del sim
-    gc.collect()
+    # sim.set_check(check=check_pre)
+
+    # sim.run(
+    #     period = 'post',
+    #     learning_rate = config['learning_rate'],
+    #     fact_checks_per_step = config['fact_checks_per_step'],
+    #     mitigation_type = 'stop_reading_misinfo'
+    # )
+
+    # with open(config['output_sim_final_intervention_stratified'] + str(rep) + '.pickle', 'wb') as file:
+    #     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # del sim
+    # gc.collect()

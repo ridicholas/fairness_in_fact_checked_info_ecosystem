@@ -5,11 +5,11 @@
     - 56
     - 43
   learning_rate: 0.2
-  num_claims: 6000 #this is number of claims per topic per timestep
-  runtime: 200
+  num_claims: 24000 #this is number of claims per topic per timestep
+  runtime: 100
   agg_interval: 3
   agg_steps: 3
-  perc_nodes_to_subset: 0.1
+  perc_nodes_to_subset: 0.3
   perc_bots: 0.1
   load_data: True
   update_beliefs: True

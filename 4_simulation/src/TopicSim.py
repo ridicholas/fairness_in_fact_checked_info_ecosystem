@@ -8,9 +8,9 @@ Created on Fri Dec  2 09:57:48 2022
 import progressbar
 import numpy as np
 import pandas as pd
-import random
 from scipy.stats import beta
-from random import choice
+from scipy.special import softmax
+import networkx as nx
 
 class TopicSim():
 
@@ -50,22 +50,26 @@ class TopicSim():
         self.post_duration = post_duration
 
     def load_simulation_network(self, ready_network_path):
-        import pickle
-        with open(ready_network_path, "rb") as f:
-            self.G = pickle.load(f)
+        import networkx
+        G = nx.read_gpickle(ready_network_path)
+        self.G = G
+        
+    def save_simulation_network(self, ready_network_path):
+        import networkx
+        nx.write_gpickle(self.G, ready_network_path)
+        print('\n\n\nNetwork Saved Successfully\n\n\n')
 
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
     def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots):
-        import networkx as nx
         G = nx.read_gpickle(raw_network_path)
         subG = self.subset_graph(G, communities=self.communities)
         sampleG = self.set_node_attributes(G=subG,
                                            perc_nodes_to_use = perc_nodes_to_subset,
                                            numTopics = self.num_topics,
                                            perc_bots = perc_bots,
-                                           impactednesses = self.impactednesses,
-                                           sentiments = self.sentiments)
+                                           impactednesses = self.impactedness,
+                                           sentiments = self.beliefs)
         self.G = sampleG
 
 
@@ -88,13 +92,19 @@ class TopicSim():
             time = range(self.runtime)
 
             # Initialize objects to collect results
+            # Stores information about every utterance (a unique ID for claim+node+time), as well as re-tweets of this utterance
             all_info = {}
             # This will capture the unique-ids of each tweet read by each node.
             node_read_tweets = {node:[] for node in nodes}
+            # Captures community sentiment for each topic over time
             community_sentiment_through_time = {com:{t:{topic: [] for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
+            # Captures which tweets read by each community (aggregate) seperated by topic (used for plots)
             community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
+            # Which tweets has a node read? Used to prevent multiple readings of the same tweets.
             node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}
-            all_claims = self.create_claims(num_claims = self.num_claims)
+            
+            #a1, a2, a3 determine spread of distribution of utterances per topic for each type of info (misinfo, noise, anti-misinfo)
+            all_claims, utterance_virality = self.create_claims(num_claims = self.num_claims)
 
         elif period == 'post':
 
@@ -103,8 +113,8 @@ class TopicSim():
             community_sentiment_through_time = self.community_sentiment_through_time
             node_read_tweets_by_time = self.node_read_tweets_by_time
             all_claims = self.all_claims
+            utterance_virality = self.utterance_virality
             community_read_tweets_by_type = self.community_read_tweets_by_type
-
 
 
             time = range(self.runtime, self.runtime*self.post_duration)
@@ -120,8 +130,10 @@ class TopicSim():
         fact_checked = []
         for step in bar(time):
                 # Loop over all nodes
+                
+                
             '''
-            Users and Information interact
+            Update fact-checking algorithm with new data
             '''
             if period == 'post' and mitigation_type != 'None':
             ##for each time step, determine which claims to fact check using classifier
@@ -134,8 +146,13 @@ class TopicSim():
                 fact_checked = fact_checked + list(preds.index[0:fact_checks_per_step])
                 fact_checked = [*set(fact_checked)]
 
-
             rankings = self.calculate_sentiment_rankings(G = G, topics = topics)
+
+            '''
+            Users and Information interact
+            '''
+
+
 
             for node, data in G.nodes(data=True):
 
@@ -157,14 +174,14 @@ class TopicSim():
                         for i in range(num_tweets):
                             topic = self.choose_topic(data = data)
                             value = self.choose_info_quality(node = node, rankings = rankings, topic = topic, agent_type = data['kind'])
-                            claim = self.choose_claim(value = value, num_claims=self.num_claims)
+                            claim = self.choose_claim(value = value, num_claims=self.num_claims, utterance_virality=utterance_virality)
                             unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                             claim_id = str(topic) + '-' + str(claim)
 
                             if mitigation_type == 'stop_reading_misinfo':
-                                #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
+                                #if this claim has been fact checked as misinformation, platform enforces no reading posting policy
                                 if not ((str(topic) + '-' + str(claim) in fact_checked) and (value == 1)):
-                                    all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
+                                    all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step, 're-tweets':[]}})
                                     new_tweets.append(unique_id)
                                     '''
                                     update checkworthy data
@@ -176,7 +193,7 @@ class TopicSim():
                                         check.update_agg_values()
 
                             else:
-                                all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step}})
+                                all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step, 're-tweets':[]}})
                                 new_tweets.append(unique_id)
                                 '''
                                 update checkworthy data
@@ -260,7 +277,7 @@ class TopicSim():
                                                                                                num_read = data['num_read'][topic],
                                                                                                learning_rate = learning_rate)
                                     '''
-                                    retweet behavior
+                                    Determine probability of retweeting based on topic, information value, claim virality, and creator prestige
                                     '''
                                     perc = self.retweet_behavior(topic = topic,
                                                                  value=value,
@@ -284,14 +301,14 @@ class TopicSim():
                                                                                             info_type = value,
                                                                                             com = data['Community'],
                                                                                             step = step)
-
-                            # update read counts by type of info
-
-
-
+                        
+                        '''
+                        retweet and capture data about cascades of re-tweets
+                        '''
                         for i in range(len(new_retweets)):
                             if retweet_perc[i] > np.random.uniform():
                                 retweets.append(new_retweets[i])
+                                all_info[new_retweets[i]]['re-tweets'].append(node)
                         data['inbox'] = []
 
                     '''
@@ -315,10 +332,11 @@ class TopicSim():
             self.node_read_tweets_by_time = node_read_tweets_by_time
             self.node_read_tweets = node_read_tweets
             self.all_claims = all_claims
+            self.utterance_virality = utterance_virality
         else:
             self.all_info = 'Removed for light storage'
             self.node_read_tweets = 'Removed for light storage'
-            self.node_read_tweets_by_time = 'Removed  for light storage'
+            self.node_read_tweets_by_time = 'Removed for light storage'
             self.all_claims = 'Removed for light storage'
         
         # These objects are used in process_data.py
@@ -367,20 +385,40 @@ class TopicSim():
                 return 'misinfo'
 
         def virality_func(x):
+            # Misinfo is 70% more viral once posted than truth.
             if x == 'anti-misinfo':
-                return 1 + np.random.beta(a=3, b=7, size=1)[0]
+                return 1 + np.random.beta(a=1, b=17, size=1)[0]
             elif x == 'noise':
-                return 1 + np.random.beta(a=1, b=9, size=1)[0]
+                return 1 + np.random.beta(a=1, b=17, size=1)[0]
             else:
-                return 1 + np.random.beta(a=6,b=4,size=1)[0]
-
+                return 1.5 + np.random.beta(a=5, b=17,size=1)[0]
+            
+        def choice_prob_func(x, info):
+            # This control probability of starting a cascade ("utterance") about a claim.
+            # anti-misinformation cascades distribution has fatter tails than misinformation, thus a1 > a3
+            if info == 'anti-misinfo':
+                return softmax(9*x**2)
+            elif info == 'noise':
+                return softmax(9*x**2)
+            else:
+                return softmax(9*x**1)
+    
         claims = pd.DataFrame(data=[i for i in range(num_claims)], columns = ['claim_id'])
         claims['type'] = claims['claim_id'].apply(type_func)
         claims['virality'] = claims['type'].apply(virality_func)
 
+        utterance_virality = {}
+        types = ['anti-misinfo', 'noise', 'misinfo']
+        keys = [-1, 0, 1]
+        for i in range(len(types)):
+           tmp = claims.loc[(claims['type']==types[i])]
+           tmp.loc[:,'utterance_virality'] = choice_prob_func(x=tmp['virality'].values,info=types[i])
+           probs = tmp['utterance_virality'].values / sum(tmp['utterance_virality'].values)
+           utterance_virality.update({keys[i]:probs})
+        
         c = claims.set_index('claim_id')
         c_dict = c.to_dict('index')
-        return c_dict
+        return c_dict, utterance_virality
 
     def calculate_sentiment_rankings(self, G, topics):
 
@@ -418,7 +456,7 @@ class TopicSim():
 
 
 
-    def choose_claim(self, value, num_claims):
+    def choose_claim(self, value, num_claims, utterance_virality):
         '''
         Within topics, there is a high-dimensional array of "potential claims". This (topic, claim) pair
         is the main feature we will use to train the fact-checking algorithm. Claims are partitioned by the quality of information
@@ -432,15 +470,15 @@ class TopicSim():
         '''
 
         if value == -1:
-            claim = random.sample(list(range(0,int(num_claims/3))), k=1)[0]
+            claim = np.random.choice(list(range(0,int(num_claims/3))), p=utterance_virality[value])
         elif value == 0:
-            claim = random.sample(list(range(int(num_claims/3),int(num_claims/3)*2)), k=1)[0]
+            claim = np.random.choice(list(range(int(num_claims/3),int(num_claims/3)*2)), p=utterance_virality[value])
         elif value == 1:
-            claim = random.sample(list(range(int(num_claims/3)*2,num_claims)), k=1)[0]
+            claim = np.random.choice(list(range(int(num_claims/3)*2,num_claims)), p=utterance_virality[value])
         return claim
 
 
-    def subset_graph(G, communities=None):
+    def subset_graph(self, G, communities):
         """
         If communities is not None, only return graph of nodes in communities subset.
 
@@ -462,10 +500,10 @@ class TopicSim():
 
         return G2
 
-    def set_node_attributes(G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
+    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
 
         import numpy as np
-        import networx as nx
+        import networkx as nx
         import random
         '''
 
@@ -534,7 +572,7 @@ class TopicSim():
         G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
         G.remove_nodes_from(list(nx.isolates(G)))
 
-        bb = nx.betweenness_centrality(G)
+        bb = nx.betweenness_centrality(G, k=1000)
         degrees = dict(G.in_degree())
         nx.set_node_attributes(G, bb, "centrality")
         nx.set_node_attributes(G, degrees, "degree")
@@ -568,6 +606,7 @@ class TopicSim():
         return community_read_tweets_by_type
 
 
+   
 
     def percentile(self, x):
         import numpy as np
