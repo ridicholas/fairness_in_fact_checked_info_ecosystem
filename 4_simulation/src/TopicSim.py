@@ -26,7 +26,11 @@ class TopicSim():
         self.node_read_tweets = {}
         self.community_sentiment_through_time = {}
         self.community_read_tweets_by_type = {}
+        self.community_checked_tweets_by_type = {}
         self.node_read_tweets_by_time = {}
+        self.set_comm_string()
+        self.start_network_path = ''
+        
 
     def set_impactedness(self, impactedness):
         self.impactedness = impactedness
@@ -45,19 +49,32 @@ class TopicSim():
 
     def return_check(self):
         return self.check
+    
+    def return_communities(self):
+        return self.communities
 
     def set_post_duration(self, post_duration):
         self.post_duration = post_duration
+    
+    def set_start_network_path(self, path):
+        self.start_network_path = path
+
+    def set_comm_string(self):
+        comm_string = ''
+        for comm in self.communities:
+            comm_string += '_' + str(comm)
+
+        self.comm_string = comm_string
+
 
     def load_simulation_network(self, ready_network_path):
-        import networkx
-        G = nx.read_gpickle(ready_network_path)
-        self.G = G
+        import pickle
+        with open(ready_network_path, "rb") as f:
+            self.G = pickle.load(f)
         
-    def save_simulation_network(self, ready_network_path):
-        import networkx
-        nx.write_gpickle(self.G, ready_network_path)
-        print('\n\n\nNetwork Saved Successfully\n\n\n')
+        self.set_start_network_path(ready_network_path)
+        
+       
 
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
@@ -71,11 +88,16 @@ class TopicSim():
                                            impactednesses = self.impactedness,
                                            sentiments = self.beliefs)
         self.G = sampleG
+        
+
+        self.start_network_path = '../output/simulation_net_communities{}.gpickle'.format(self.comm_string)
+        nx.write_gpickle(self.G, '../output/simulation_net_communities{}.gpickle'.format(self.comm_string))
+        
 
 
 
 
-    def run(self, period, learning_rate, fact_checks_per_step, mitigation_type):
+    def run(self, period, learning_rate, min_degree, fact_checks_per_step, mitigation_type):
 
 
         G = self.G
@@ -101,10 +123,11 @@ class TopicSim():
             # Captures which tweets read by each community (aggregate) seperated by topic (used for plots)
             community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
             # Which tweets has a node read? Used to prevent multiple readings of the same tweets.
-            node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}
-            
+            node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}            
             #a1, a2, a3 determine spread of distribution of utterances per topic for each type of info (misinfo, noise, anti-misinfo)
             all_claims, utterance_virality = self.create_claims(num_claims = self.num_claims)
+            community_checked_tweets_by_type = {}
+            
 
         elif period == 'post':
 
@@ -115,6 +138,7 @@ class TopicSim():
             all_claims = self.all_claims
             utterance_virality = self.utterance_virality
             community_read_tweets_by_type = self.community_read_tweets_by_type
+            community_checked_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)} for com in self.communities}
 
 
             time = range(self.runtime, self.runtime*self.post_duration)
@@ -123,6 +147,7 @@ class TopicSim():
             for com in self.communities:
                 community_sentiment_through_time[com].update({t:{topic: [] for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
                 community_read_tweets_by_type[com].update({t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
+                community_checked_tweets_by_type[com].update({t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime, self.runtime*self.post_duration)})
 
 
 
@@ -187,10 +212,11 @@ class TopicSim():
                                     update checkworthy data
                                     '''
                                     check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = claim)
-                                    if claim_id not in check.checkworthy_data.keys():
-                                        check.update_keys()
-                                    else:
-                                        check.update_agg_values()
+                                    if data['degree'] >= min_degree:
+                                        if claim_id not in check.checkworthy_data.keys():
+                                            check.update_keys()
+                                        else:
+                                            check.update_agg_values()
 
                             else:
                                 all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step, 're-tweets':[]}})
@@ -199,10 +225,11 @@ class TopicSim():
                                 update checkworthy data
                                 '''
                                 check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = claim)
-                                if claim_id not in check.checkworthy_data.keys():
-                                    check.update_keys()
-                                else:
-                                    check.update_agg_values()
+                                if data['degree'] >= min_degree:
+                                    if claim_id not in check.checkworthy_data.keys():
+                                        check.update_keys()
+                                    else:
+                                        check.update_agg_values()
 
 
                     '''
@@ -219,6 +246,15 @@ class TopicSim():
                                 topic = all_info[read_tweet]['topic']
                                 value = all_info[read_tweet]['value']
                                 read_claim = all_info[read_tweet]['claim']
+
+                                #if claim is fact checked, add it to checked by type tracker
+                                if (str(topic) + '-' + str(read_claim)) in fact_checked:
+                                    community_checked_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_checked_tweets_by_type,
+                                                                                                topic = topic,
+                                                                                                info_type = value,
+                                                                                                com = data['Community'],
+                                                                                                step = step)
+
                                 #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
                                 if mitigation_type == "stop_reading_misinfo":
                                     if not ((str(topic) + '-' + str(read_claim) in fact_checked) and (value == 1)):
@@ -254,7 +290,12 @@ class TopicSim():
                                             origin_node = read_tweet.split('-')[2]
                                             claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
                                             check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-                                            check.update_time_values(time_feature=time_feature, origin_node=origin_node)
+                                            if data['degree'] >= min_degree:
+
+                                                if claim_id not in check.checkworthy_data.keys():
+                                                    check.update_keys()
+                                                else:
+                                                    check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
                                         community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                                 topic = topic,
@@ -294,7 +335,11 @@ class TopicSim():
                                         origin_node = read_tweet.split('-')[2]
                                         claim_id = read_tweet.split('-')[0] + '-' + read_tweet.split('-')[1]
                                         check.intake_information(node = node, data = data, claim_id = claim_id, value = value, topic = topic, claim = read_claim)
-                                        check.update_time_values(time_feature=time_feature, origin_node=origin_node)
+                                        if data['degree'] >= min_degree:
+                                            if claim_id not in check.checkworthy_data.keys():
+                                                check.update_keys()
+                                            else:
+                                                check.update_time_values(time_feature=time_feature, origin_node=origin_node)
 
                                     community_read_tweets_by_type = self.update_read_counts(community_read_tweets_by_type = community_read_tweets_by_type,
                                                                                             topic = topic,
@@ -340,11 +385,13 @@ class TopicSim():
             self.all_claims = 'Removed for light storage'
         
         # These objects are used in process_data.py
-        check.set_network(G=G)
+        check.set_network(G=G, communities=self.communities)
         self.G = G
         self.check = check
         self.community_sentiment_through_time = community_sentiment_through_time
         self.community_read_tweets_by_type = community_read_tweets_by_type
+        self.community_checked_tweets_by_type = community_checked_tweets_by_type
+        
 
         
 
@@ -572,7 +619,7 @@ class TopicSim():
         G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
         G.remove_nodes_from(list(nx.isolates(G)))
 
-        bb = nx.betweenness_centrality(G, k=1000)
+        bb = nx.betweenness_centrality(G, k=int(0.1*len(list(G.nodes()))))
         degrees = dict(G.in_degree())
         nx.set_node_attributes(G, bb, "centrality")
         nx.set_node_attributes(G, degrees, "degree")
@@ -615,3 +662,33 @@ class TopicSim():
         x = np.array(x)
         ranks = rankdata(x)
         return(ranks/len(x))
+
+def random_community_sample(community_graph, min_network_size=100000, max_network_size=200000):
+        """
+        Select a random subset of communities such that total number of nodes is between min and max network size.
+        """
+        import networkx as nx
+        from random import sample
+
+        communities = []
+        community_sizes = pd.Series(nx.get_node_attributes(community_graph, 'SIZE'))
+        community_sizes.index = community_sizes.index.astype(int)
+        community_sizes = community_sizes[community_sizes >= 10000]
+        num_network_nodes = 0
+
+        while num_network_nodes < min_network_size or len(communities) < 2:
+            community = int(sample(list(community_sizes.index), 1)[0])
+        
+            if community_sizes.loc[communities + [community]].sum() < max_network_size and (community not in communities):
+                communities.append(community)
+                num_network_nodes += community_sizes[community]
+        
+
+        return communities
+
+def make_comm_string(communities):
+        comm_string = ''
+        for comm in communities:
+            comm_string += '_' + str(comm)
+
+        return comm_string

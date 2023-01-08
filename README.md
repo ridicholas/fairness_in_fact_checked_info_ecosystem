@@ -1,6 +1,6 @@
 # fairness_in_fact_checked_info_ecosystem
 
-This is the code for Terry and Nick's Fairness in a Fact Checked Information Ecosystem course project. 
+This is the code for our Fairness in a Fact Checked Information Ecosystem course project. 
 
 1_detect_communities contains the create_network script which loads in the initial network, identifies communities, and appends the community as a node attribute. 
 
