@@ -137,10 +137,6 @@ def main(argv):
             else: #load network that was created in first rep
                 sim.load_simulation_network(ready_network_path = start_network_path)
                 
-
-                
-
-
             # Pass network to Checkworthy object
             check.set_network(G = sim.return_network(), communities=sim.return_communities())
             # reset checkworthy object object
