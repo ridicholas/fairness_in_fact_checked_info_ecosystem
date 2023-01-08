@@ -28,6 +28,9 @@ class TopicSim():
         self.community_read_tweets_by_type = {}
         self.community_checked_tweets_by_type = {}
         self.node_read_tweets_by_time = {}
+        self.set_comm_string()
+        self.start_network_path = ''
+        
 
     def set_impactedness(self, impactedness):
         self.impactedness = impactedness
@@ -52,11 +55,24 @@ class TopicSim():
 
     def set_post_duration(self, post_duration):
         self.post_duration = post_duration
+    
+    def set_start_network_path(self, path):
+        self.start_network_path = path
+
+    def set_comm_string(self):
+        comm_string = ''
+        for comm in self.communities:
+            comm_string += '_' + str(comm)
+
+        self.comm_string = comm_string
+
 
     def load_simulation_network(self, ready_network_path):
         import pickle
         with open(ready_network_path, "rb") as f:
             self.G = pickle.load(f)
+        
+        self.set_start_network_path(ready_network_path)
 
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
@@ -68,9 +84,14 @@ class TopicSim():
                                            perc_nodes_to_use = perc_nodes_to_subset,
                                            numTopics = self.num_topics,
                                            perc_bots = perc_bots,
-                                           impactednesses = self.impactednesses,
-                                           sentiments = self.sentiments)
+                                           impactednesses = self.impactedness,
+                                           sentiments = self.beliefs)
         self.G = sampleG
+        
+
+        self.start_network_path = '../output/simulation_net_communities{}.gpickle'.format(self.comm_string)
+        nx.write_gpickle(self.G, '../output/simulation_net_communities{}.gpickle'.format(self.comm_string))
+        
 
 
 
@@ -470,7 +491,7 @@ class TopicSim():
         return claim
 
 
-    def subset_graph(G, communities=None):
+    def subset_graph(self, G, communities=None):
         """
         If communities is not None, only return graph of nodes in communities subset.
 
@@ -492,7 +513,7 @@ class TopicSim():
 
         return G2
 
-    def set_node_attributes(G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
+    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
 
         import numpy as np
         import networkx as nx
@@ -564,7 +585,7 @@ class TopicSim():
         G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
         G.remove_nodes_from(list(nx.isolates(G)))
 
-        bb = nx.betweenness_centrality(G)
+        bb = nx.betweenness_centrality(G, k=int(0.1*len(list(G.nodes()))))
         degrees = dict(G.in_degree())
         nx.set_node_attributes(G, bb, "centrality")
         nx.set_node_attributes(G, degrees, "degree")
@@ -606,3 +627,33 @@ class TopicSim():
         x = np.array(x)
         ranks = rankdata(x)
         return(ranks/len(x))
+
+def random_community_sample(community_graph, min_network_size=100000, max_network_size=200000):
+        """
+        Select a random subset of communities such that total number of nodes is between min and max network size.
+        """
+        import networkx as nx
+        from random import sample
+
+        communities = []
+        community_sizes = pd.Series(nx.get_node_attributes(community_graph, 'SIZE'))
+        community_sizes.index = community_sizes.index.astype(int)
+        community_sizes = community_sizes[community_sizes >= 10000]
+        num_network_nodes = 0
+
+        while num_network_nodes < min_network_size or len(communities) < 2:
+            community = int(sample(list(community_sizes.index), 1)[0])
+        
+            if community_sizes.loc[communities + [community]].sum() < max_network_size and (community not in communities):
+                communities.append(community)
+                num_network_nodes += community_sizes[community]
+        
+
+        return communities
+
+def make_comm_string(communities):
+        comm_string = ''
+        for comm in communities:
+            comm_string += '_' + str(comm)
+
+        return comm_string
