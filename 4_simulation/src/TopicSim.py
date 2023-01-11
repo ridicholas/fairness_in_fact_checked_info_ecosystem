@@ -320,11 +320,11 @@ class TopicSim():
                         for follower in predecessors:
                             G.nodes[follower]['inbox'].extend(new_tweets)
 
-                    '''
-                    Capture sentiment across topics for node
-                    '''
-                    for topic in range(self.num_topics):
-                        community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
+                '''
+                Capture sentiment across topics for node
+                '''
+                for topic in range(self.num_topics):
+                    community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
         
         if period == 'pre':
