@@ -29,8 +29,10 @@ class Checkworthy():
         self.get_node_attributes = get_node_attributes
 
 
-    def set_network(self, G):
+    def set_network(self, G, communities):
         self.G = G
+        self.communities = communities
+
 
 
     def intake_information(self, node, data, claim_id, value, topic, claim):
@@ -40,8 +42,8 @@ class Checkworthy():
         self.value = value
         self.topic = topic
         self.claim = claim
-        if self.claim_id not in self.checkworthy_data.keys():
-            self.update_keys()
+        #if self.claim_id not in self.checkworthy_data.keys():
+        #    self.update_keys()
 
 
     def update_keys(self):
@@ -54,6 +56,13 @@ class Checkworthy():
                                   'max_degree_of_origins': self.data['degree'],
                                   'avg_centrality_of_origins': self.data['centrality'],
                                   'max_centrality_of_origins': self.data['centrality']}})
+        
+        for comm in self.communities:
+            if comm == self.data['Community']:
+                self.checkworthy_data[self.claim_id]['nodes_visited_in_community{}'.format(comm)] = 1
+            else:
+                self.checkworthy_data[self.claim_id]['nodes_visited_in_community{}'.format(comm)] = 0
+
 
 
     def update_agg_values(self):
@@ -67,7 +76,7 @@ class Checkworthy():
             self.checkworthy_data[claim_id]['max_centrality_of_origins'] = data['centrality']
         self.checkworthy_data[claim_id]['avg_degree_of_origins'] += (data['degree'] - self.checkworthy_data[claim_id]['avg_degree_of_origins'])/self.checkworthy_data[claim_id]['num_of_origins']
         self.checkworthy_data[claim_id]['avg_centrality_of_origins'] += (data['centrality'] - self.checkworthy_data[claim_id]['avg_centrality_of_origins'])/self.checkworthy_data[claim_id]['num_of_origins']
-
+        self.checkworthy_data[claim_id]['nodes_visited_in_community{}'.format(data['Community'])] += 1
 
     def update_time_values(self, time_feature, origin_node):
 
@@ -104,6 +113,8 @@ class Checkworthy():
 
             if distance > self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)]:
                 self.checkworthy_data[claim_id]['step{}_max_depth_from_origin'.format(time_feature)] = distance
+            
+            self.checkworthy_data[claim_id]['nodes_visited_in_community{}'.format(data['Community'])] += 1
 
 
     def sample_claims(self, num_to_sample=2000, sample_method='random'):
@@ -111,8 +122,8 @@ class Checkworthy():
 
         
         checkworthy_data = pd.DataFrame(self.checkworthy_data).transpose().copy()
-        checkworthy_data['total_nodes_visited'] = checkworthy_data['num_of_origins']
-        visit_cols = checkworthy_data.columns.str.contains('nodes_visited')
+        checkworthy_data['total_nodes_visited'] = 0
+        visit_cols = checkworthy_data.columns.str.contains('nodes_visited_community')
         for col in checkworthy_data.columns[visit_cols]:
             checkworthy_data['total_nodes_visited'] += checkworthy_data[col]
 
@@ -131,6 +142,21 @@ class Checkworthy():
         
         if sample_method == 'nodes_visited':
             checkworthy_data = checkworthy_data.sort_values(by='total_nodes_visited', ascending=False).iloc[0:numSamples, :]
+
+        if sample_method == 'stratified_nodes_visited':
+            indexes_to_keep = []
+            numSamples = int(numSamples/len(self.communities))
+            check_copy = checkworthy_data.copy(deep=True)
+            for comm in self.communities:
+                indexes = list(check_copy.sort_values(by='nodes_visited_in_community{}'.format(comm), ascending=False).iloc[0:numSamples, :].index)
+                check_copy.drop(index=indexes, inplace=True)
+                indexes_to_keep += indexes
+            checkworthy_data.drop(index=list(set(checkworthy_data.index) - set(indexes_to_keep)), inplace=True)
+            
+            
+
+
+
 
 
         self.sampled_checkworthy_data = self.checkworthy_data.copy()
