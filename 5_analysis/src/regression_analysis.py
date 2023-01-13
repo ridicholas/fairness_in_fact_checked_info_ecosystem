@@ -25,10 +25,14 @@ data[cols] = data[cols].apply(pd.to_numeric, errors='coerce')
 #basic regression
 print('pause')
 
-results = smf.ols('misinfo_read ~ size + perc_of_net*C(mod, Treatment(reference="no_intervention_")) +  \
+results = smf.ols('change_in_belief ~ C(mod, Treatment(reference="no_intervention_"))', data=data).fit()
+
+results = smf.ols('change_in_belief ~ size + perc_of_largest*C(mod, Treatment(reference="no_intervention_")) +  \
        avg_degree_within_graph + avg_degree_within_community + density + \
        cluster_coef + average_centrality_of_nodes + comm_centrality + \
-       impactedness + start_belief + perc_of_largest + \
+       impactedness + start_belief + perc_of_net + \
        ratio_connections_self_to_largest_self + \
        ratio_connections_self_to_largest_largest', data=data).fit()
+
+
 

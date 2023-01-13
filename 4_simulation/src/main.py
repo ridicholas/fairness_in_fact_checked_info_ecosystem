@@ -30,8 +30,7 @@ def main(argv):
     reps = 10
 
     
-    
-    
+
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     
@@ -114,7 +113,8 @@ def main(argv):
                 num_topics = num_topics,
                 runtime = config['runtime'],
                 communities = communities,
-                num_claims = config['num_claims']
+                num_claims = config['num_claims'],
+                rep=rep
             )
 
             '''
@@ -124,19 +124,13 @@ def main(argv):
 
             if config['load_data'] and not(config['random_communities']): 
                 sim.load_simulation_network(ready_network_path = config['ready_network_path'])
-            elif rep==0: #no need to recreate network on subsequent reps
+            else: #no need to recreate network on subsequent reps
                 sim.create_simulation_network(
                     raw_network_path = config['raw_network_path'],
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
                     perc_bots = config['perc_bots']
                 )
-
-                start_network_path = sim.start_network_path
-
-
-            else: #load network that was created in first rep
-                sim.load_simulation_network(ready_network_path = start_network_path)
-                
+        
             # Pass network to Checkworthy object
             check.set_network(G = sim.return_network(), communities=sim.return_communities())
             # reset checkworthy object object

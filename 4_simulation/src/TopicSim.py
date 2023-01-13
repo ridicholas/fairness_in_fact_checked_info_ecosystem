@@ -13,7 +13,7 @@ import networkx as nx
 
 class TopicSim():
 
-    def __init__(self, impactedness, beliefs, num_topics, runtime, communities, num_claims):
+    def __init__(self, impactedness, beliefs, num_topics, runtime, communities, num_claims, rep):
 
         self.impactedness = impactedness
         self.beliefs = beliefs
@@ -29,6 +29,7 @@ class TopicSim():
         self.node_read_tweets_by_time = {}
         self.set_comm_string()
         self.start_network_path = ''
+        self.rep = rep
         
 
     def set_impactedness(self, impactedness):
@@ -89,8 +90,8 @@ class TopicSim():
         self.G = sampleG
         
 
-        self.start_network_path = '../output/simulation_net_communities{}.gpickle'.format(self.comm_string)
-        nx.write_gpickle(self.G, '../output/simulation_net_communities{}.gpickle'.format(self.comm_string))
+        self.start_network_path = '../output/simulation_net_run{}_communities{}.gpickle'.format(self.rep, self.comm_string)
+        nx.write_gpickle(self.G, self.start_network_path)
         
 
 

@@ -64,15 +64,19 @@ def get_network_structure_stats(start_network_path):
             stats[comm]['ratio_connections_self_to_largest_self'] = weights[(comm, largest_community)]/weights[(comm,comm)]
             stats[comm]['ratio_connections_self_to_largest_largest'] = weights[(comm, largest_community)]/weights[(largest_community,largest_community)]
         except:
-            stats[comm]['ratio_connections_self_to_largest_self'] = weights[(largest_community, comm)]/weights[(comm,comm)]
-            stats[comm]['ratio_connections_self_to_largest_largest'] = weights[(largest_community, comm)]/weights[(largest_community,largest_community)]
+            try:
+                stats[comm]['ratio_connections_self_to_largest_self'] = weights[(largest_community, comm)]/weights[(comm,comm)]
+                stats[comm]['ratio_connections_self_to_largest_largest'] = weights[(largest_community, comm)]/weights[(largest_community,largest_community)]
+            except:
+                stats[comm]['ratio_connections_self_to_largest_self'] = 0
+                stats[comm]['ratio_connections_self_to_largest_largest'] = 0
            
         
-    return stats
+    return stats, communities
     
     
 
-def make_results(infile, network_stats, reps, modules, communities):
+def make_results(infile, reps, modules, communities):
 
 
     import TopicSim
@@ -92,9 +96,12 @@ def make_results(infile, network_stats, reps, modules, communities):
     checks = {}
     beliefs = {}
 
-    stats = network_stats
+    
 
     for rep in range(reps):
+
+        start_path = '../../4_simulation/output/simulation_net_run{}_communities_{}.gpickle'.format(rep, comms)
+        stats, comm_list = get_network_structure_stats(start_path)
 
         print('\n\n\n\n\n Processing Reads Data - Repetition #' + str(rep) + '------ \n\n\n\n')
 
@@ -121,7 +128,7 @@ def make_results(infile, network_stats, reps, modules, communities):
             community_checked_over_time = sim.community_checked_tweets_by_type
 
             #rearrange dictionaries
-            for comm in community_read_over_time.keys():
+            for comm in comm_list:
                 keys = list(range(sim.num_topics))
                 reads[rep][mod][comm] = {key:{k:community_read_over_time[comm][k][key] for k in community_read_over_time[comm] if key in community_read_over_time[comm][k]} for key in keys}
                 for topic in keys:
@@ -129,7 +136,7 @@ def make_results(infile, network_stats, reps, modules, communities):
                     reads[rep][mod][comm][topic] = {key:{k:reads[rep][mod][comm][topic][k][key] for k in reads[rep][mod][comm][topic] if key in reads[rep][mod][comm][topic][k]} for key in new_keys}
             
             
-            for comm in community_checked_over_time.keys():
+            for comm in comm_list:
                 keys = list(range(sim.num_topics))
                 checks[rep][mod][comm] = {key:{k:community_checked_over_time[comm][k][key] for k in community_checked_over_time[comm] if key in community_checked_over_time[comm][k]} for key in keys}
                 for topic in keys:
@@ -137,7 +144,7 @@ def make_results(infile, network_stats, reps, modules, communities):
                     checks[rep][mod][comm][topic] = {key:{k:checks[rep][mod][comm][topic][k][key] for k in checks[rep][mod][comm][topic] if key in checks[rep][mod][comm][topic][k]} for key in new_keys}
                 
             
-            for comm in community_sentiment_through_time.keys():
+            for comm in comm_list:
                 keys = list(range(sim.num_topics))
                 beliefs[rep][mod][comm] = {key:{k:community_sentiment_through_time[comm][k][key] for k in community_sentiment_through_time[comm] if key in community_sentiment_through_time[comm][k]} for key in keys}
                 for topic in keys:
@@ -146,7 +153,7 @@ def make_results(infile, network_stats, reps, modules, communities):
             
             
 
-            comm_list = sim.communities
+            
             topics = list(range(sim.num_topics))
             impactedness = sim.impactedness
             start_beliefs = sim.beliefs
@@ -248,7 +255,7 @@ modules = ['no_intervention_']
 label_methods = ['random', 'stratified', 'knowledgable_community']
 sample_methods = ['nodes_visited', 'stratified_nodes_visited']
 infile = '../../4_simulation/output/simulation_final_'
-comms = '12_28_56_43' #manually input this for now, we can write an automated finder later
+comms = '49_43_127_120' #manually input this for now, we can write an automated finder later
 start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
 regression_outfile = '../output/regression' +  comms
 
@@ -256,11 +263,10 @@ for l in label_methods:
     for s in sample_methods:
         modules.append('intervention_' + l + '_' + s +'_')
 
-stats = get_network_structure_stats(start_network_path=start_network_path)
 
-reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile,
-                                                                                            network_stats = stats,
-                                                                                            reps = 10,
+
+reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile, 
+                                                                                            reps = 5,
                                                                                             modules = modules,
                                                                                             communities=comms)
 
