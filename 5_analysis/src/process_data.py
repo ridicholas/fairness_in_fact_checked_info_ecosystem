@@ -99,8 +99,8 @@ def process_community_belief(infile, reps, modules):
 print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
 
 clean_community_belief = process_community_belief(infile = '../../4_simulation/output/simulation_final_',
-                                                  reps = 8,
-                                                  modules=['no_intervention','intervention_random_label', 'intervention_stratified_label', 'intervention_kc_label'])
+                                                  reps = 4,
+                                                  modules=['no_intervention','intervention_random_label_random_sample_standard_mitigation', 'intervention_kc_label_stratified_sample_topic_mitigation'])
 
 clean_community_belief.to_csv('../output/exp_results_community_belief.csv', index = False)
 
@@ -108,7 +108,7 @@ clean_community_belief.to_csv('../output/exp_results_community_belief.csv', inde
 print('\n\n\n ------- Processing Information Read Over Time ------- \n\n\n')
 
 result = make_reads_by_time_frame(infile = '../../4_simulation/output/simulation_final_',
-                                  reps = 8,
-                                  modules = ['no_intervention','intervention_random_label', 'intervention_stratified_label', 'intervention_kc_label'])
+                                  reps = 4,
+                                  modules = ['no_intervention','intervention_random_label_random_sample_standard_mitigation', 'intervention_kc_label_stratified_sample_topic_mitigation'])
 
 result.to_pickle('../output/exp_results_information_read_aggregated.pickle')

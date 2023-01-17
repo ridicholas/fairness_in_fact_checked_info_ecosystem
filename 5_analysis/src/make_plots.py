@@ -86,13 +86,13 @@ def plot_total_misinfo_reads_over_time(midpoint, smooth_interval = 25):
     
     
     
-    colors = {'Community Stratified Label':'blue', 'No Intervention':'black', 'Random Label':'darkred', 'Knowledgeable Community Label':'orange'}  
+    colors = {'No Intervention':'black', 'Random Label - Top View Sampling - Standard Mitigation':'darkred', 'KC Label - Strat. Top View Sampling - Topic Mitigation':'orange'}  
 
     reads_over_time = pd.read_pickle('../output/exp_results_information_read_aggregated.pickle')
     reads_over_time = reads_over_time.sort_values(by=['Community', 'Topic', 'Type', 'Intervention', 'Step'])
     reads_over_time['Intervention'] = np.where(reads_over_time['Intervention'] == 'no_intervention', 'No Intervention',
-                                               np.where(reads_over_time['Intervention']=='intervention_kc_label', 'Knowledgeable Community Label',
-                                                        np.where(reads_over_time['Intervention']=='intervention_random_label', 'Random Label', 'Community Stratified Label')))
+                                               np.where(reads_over_time['Intervention']=='intervention_kc_label_stratified_sample_topic_mitigation', 'KC Label - Strat. Top View Sampling - Topic Mitigation',
+                                                        np.where(reads_over_time['Intervention']=='intervention_random_label_random_sample_standard_mitigation', 'Random Label - Top View Sampling - Standard Mitigation', 'Community Stratified Label')))
     
     
     reads_over_time['Topic'] = 'Topic ' + reads_over_time['Topic'].astype(int).apply(str)
@@ -107,7 +107,7 @@ def plot_total_misinfo_reads_over_time(midpoint, smooth_interval = 25):
     
     # 1. Community + Topic Breakdown of Misinfo read across trials.
     reads_over_time_misinfo = reads_over_time_mean\
-        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]
+        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 10)]
 
 
     plt=(ggplot(reads_over_time_misinfo, aes(x='Step',y='Reads (moving average)', color = 'Intervention'))
@@ -161,12 +161,12 @@ def plot_total_misinfo_reads_over_time(midpoint, smooth_interval = 25):
 def make_community_sentiment_plot(midpoint, smooth_interval = 25):
     
     
-    colors = {'Community Stratified Label':'blue', 'No Intervention':'black', 'Random Label':'darkred', 'Knowledgeable Community Label':'orange'}  
+    colors = {'No Intervention':'black', 'Random Label - Top View Sampling - Standard Mitigation':'darkred', 'KC Label - Strat. Top View Sampling - Topic Mitigation':'orange'}  
 
     community_sentiment = pd.read_csv('../output/exp_results_community_belief.csv')
     community_sentiment['Intervention'] = np.where(community_sentiment['Intervention'] == 'no_intervention', 'No Intervention',
-                                               np.where(community_sentiment['Intervention']=='intervention_kc_label', 'Knowledgeable Community Label',
-                                                        np.where(community_sentiment['Intervention']=='intervention_random_label', 'Random Label', 'Community Stratified Label')))
+                                               np.where(community_sentiment['Intervention']=='intervention_kc_label_stratified_sample_topic_mitigation', 'KC Label - Strat. Top View Sampling - Topic Mitigation',
+                                                        np.where(community_sentiment['Intervention']=='intervention_random_label_random_sample_standard_mitigation', 'Random Label - Top View Sampling - Standard Mitigation', 'Community Stratified Label')))
     community_sentiment['Topic'] = 'Topic ' + community_sentiment['Topic'].astype(int).apply(str)
     community_sentiment['Community'] = 'Community ' + community_sentiment['Community'].astype(int).apply(str)
     
@@ -229,5 +229,5 @@ def make_community_sentiment_plot(midpoint, smooth_interval = 25):
     plt.save(filename='../output/mean_belief_no_intervention.png', width = 12, height = 6)
 
 
-plot_total_misinfo_reads_over_time(midpoint = 200)
-make_community_sentiment_plot(midpoint = 200)
+plot_total_misinfo_reads_over_time(midpoint = 100)
+make_community_sentiment_plot(midpoint = 100)
