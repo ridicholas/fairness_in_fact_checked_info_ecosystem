@@ -123,7 +123,7 @@ class Checkworthy():
         
         checkworthy_data = pd.DataFrame(self.checkworthy_data).transpose().copy()
         checkworthy_data['total_nodes_visited'] = 0
-        visit_cols = checkworthy_data.columns.str.contains('nodes_visited_community')
+        visit_cols = checkworthy_data.columns.str.contains('nodes_visited_in_community')
         for col in checkworthy_data.columns[visit_cols]:
             checkworthy_data['total_nodes_visited'] += checkworthy_data[col]
 
@@ -163,6 +163,8 @@ class Checkworthy():
         for key in list(self.checkworthy_data.keys()):
             if key not in checkworthy_data.index:
                 self.sampled_checkworthy_data.pop(key)
+        
+        
         
         
 
