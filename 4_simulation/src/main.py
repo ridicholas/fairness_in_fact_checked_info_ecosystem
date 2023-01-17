@@ -27,7 +27,7 @@ def main(argv):
             period = arg
     
 
-    reps = 10
+    reps = 2
 
     
 
@@ -207,7 +207,7 @@ def main(argv):
                     mitigation_type = mitigation_method
                 )
 
-                with open('../output/simulation_final_intervention_{}_{}'.format(label_method, sample_method) + '_run' + \
+                with open('../output/simulation_{}_{}_{}'.format(mitigation_method, label_method, sample_method) + '_run' + \
                     str(rep) +  '_communities' + sim.comm_string + '.pickle', 'wb') as file:
                     pickle.dump(sim, file, protocol=pickle.HIGHEST_PROTOCOL)
 

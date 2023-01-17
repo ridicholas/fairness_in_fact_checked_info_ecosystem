@@ -14,6 +14,10 @@ data/
 *.gexf
 *.csv
 *.out
+*.zip
+output/
+/output
+*/output/*
 
 .DS_Store
 
