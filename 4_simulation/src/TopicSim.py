@@ -160,16 +160,32 @@ class TopicSim():
             '''
             Update fact-checking algorithm with new data
             '''
-            if period == 'post' and mitigation_type != 'None':
+            if period == 'post' and mitigation_type == 'TopPredicted':
             ##for each time step, determine which claims to fact check using classifier
                 check_df = pd.DataFrame.from_dict(self.check.checkworthy_data).T.fillna(0)
-                x = check_df[[i for i in check_df.columns if ('truth' not in i) and ('target' not in i) and ('claim' not in i) and ('outcome' not in i) and ('value' not in i)]]
+                x = check_df[[i for i in check_df.columns if ('num_of_origins' not in i) and ('count' not in i) and ('truth' not in i) and ('target' not in i) and ('claim' not in i) and ('outcome' not in i) and ('value' not in i)]]
                 x = x[check.cols_when_model_builds]
-                preds = pd.Series(check.clf.predict(x), index=check_df.index)
+                preds = pd.Series(check.clf.predict(x)*check.reg.predict(x), index=check_df.index)
                 preds = preds.drop(fact_checked)
                 preds.sort_values(ascending=False, inplace=True)
                 fact_checked = fact_checked + list(preds.index[0:fact_checks_per_step])
                 fact_checked = [*set(fact_checked)]
+                
+            elif period == 'post' and mitigation_type == 'TopPredictedByTopic':
+            ##for each time step, determine which claims to fact check using classifier
+                check_df = pd.DataFrame.from_dict(self.check.checkworthy_data).T.fillna(0)
+                x = check_df[[i for i in check_df.columns if ('num_of_origins' not in i) and ('count' not in i) and ('truth' not in i) and ('target' not in i) and ('claim' not in i) and ('outcome' not in i) and ('value' not in i)]]
+                x = x[check.cols_when_model_builds]
+                x['preds'] = check.clf.predict(x)*check.reg.predict(x)
+                preds = x[["preds", "topic"]]
+                preds = preds.drop(fact_checked)                
+
+                for tpc in range(self.num_topics):
+                    preds.sort_values(by = ['preds'], ascending=False, inplace=True)
+                    preds_topic = preds.loc[preds['topic']==tpc]
+                    fact_checked = fact_checked + list(preds_topic.index[0:int(fact_checks_per_step/self.num_topics)])
+                    fact_checked = [*set(fact_checked)]
+
 
             rankings = self.calculate_sentiment_rankings(G = G, topics = topics)
 
@@ -203,7 +219,7 @@ class TopicSim():
                             unique_id = str(topic) + '-' + str(claim) + '-' + str(node) + '-' + str(step)
                             claim_id = str(topic) + '-' + str(claim)
 
-                            if mitigation_type == 'stop_reading_misinfo':
+                            if mitigation_type != 'None':
                                 #if this claim has been fact checked as misinformation, platform enforces no reading posting policy
                                 if not ((str(topic) + '-' + str(claim) in fact_checked) and (value == 1)):
                                     all_info.update({unique_id: {'topic':topic,'value':value,'claim':claim,'node-origin':node,'time-origin':step, 're-tweets':[]}})
@@ -256,7 +272,7 @@ class TopicSim():
                                                                                                 step = step)
 
                                 #if this claim has been fact checked as misinformation, everyone stops reading/tweeting/believing them
-                                if mitigation_type == "stop_reading_misinfo":
+                                if mitigation_type != "None":
                                     if not ((str(topic) + '-' + str(read_claim) in fact_checked) and (value == 1)):
                                         virality = all_claims[read_claim]['virality']
                                         topic_sentiment = data['sentiment'][topic]
@@ -365,7 +381,7 @@ class TopicSim():
                         for follower in predecessors:
                             G.nodes[follower]['inbox'].extend(new_tweets)
 
-                    '''
+                '''
                 Capture sentiment across topics for node
                 '''
                 for topic in range(self.num_topics):

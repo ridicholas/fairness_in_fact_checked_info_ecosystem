@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -269,8 +271,6 @@ reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = m
                                                                                             reps = 5,
                                                                                             modules = modules,
                                                                                             communities=comms)
-
-
 
 regression.to_pickle(regression_outfile + '.pickle')
 regression.to_csv(regression_outfile + '.csv')
