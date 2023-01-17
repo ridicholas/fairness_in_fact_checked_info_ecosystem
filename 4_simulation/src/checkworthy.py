@@ -168,6 +168,8 @@ class Checkworthy():
                 self.sampled_checkworthy_data.pop(key)
         
         
+        
+        
 
     def sample_labels_for_claims(self, labels_per_claim = 6, sample_method = 'random'):
 

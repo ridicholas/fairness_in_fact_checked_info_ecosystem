@@ -272,7 +272,8 @@ reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = m
                                                                                             modules = modules,
                                                                                             communities=comms)
 
-
-
 regression.to_pickle(regression_outfile + '.pickle')
 regression.to_csv(regression_outfile + '.csv')
+
+
+#result.to_pickle('../output/exp_results_information_read_aggregated.pickle')

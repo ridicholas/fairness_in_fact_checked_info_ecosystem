@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Dec  2 09:57:48 2022
-
 @author: tdn897
 """
 import progressbar
@@ -14,7 +13,7 @@ import networkx as nx
 
 class TopicSim():
 
-    def __init__(self, impactedness, beliefs, num_topics, runtime, communities, num_claims):
+    def __init__(self, impactedness, beliefs, num_topics, runtime, communities, num_claims, rep):
 
         self.impactedness = impactedness
         self.beliefs = beliefs
@@ -30,6 +29,7 @@ class TopicSim():
         self.node_read_tweets_by_time = {}
         self.set_comm_string()
         self.start_network_path = ''
+        self.rep = rep
         
 
     def set_impactedness(self, impactedness):
@@ -90,8 +90,8 @@ class TopicSim():
         self.G = sampleG
         
 
-        self.start_network_path = '../output/simulation_net_communities{}.gpickle'.format(self.comm_string)
-        nx.write_gpickle(self.G, '../output/simulation_net_communities{}.gpickle'.format(self.comm_string))
+        self.start_network_path = '../output/simulation_net_run{}_communities{}.gpickle'.format(self.rep, self.comm_string)
+        nx.write_gpickle(self.G, self.start_network_path)
         
 
 
@@ -423,10 +423,8 @@ class TopicSim():
         to their percentile rankings of sentiment deviation from the mean, such that those with low sentiment
         produce more anti-misinformation, and those with high sentiment produce more misinformation, but noise is always the most common
         info type produced.
-
         Because B(a,b) is bounded by (0, 1), we can just use thirds as cut points to effectively give different
         probabilistic weight to information quality in {-1, 0, 1}.
-
         Bots produce misinformation 80% of the time
         '''
         if agent_type != 'bot':
@@ -490,12 +488,10 @@ class TopicSim():
         This function returns a pandas DataFrame with all nodes' percentile rankings of deviation from mean sentiment across all topics.
         This ranking is multiplied by -1 if they have a negative deviation and by +1 if they have a positive deviation,
         creating a range of possible values [-1,1].
-
         This pandas dataframe is used as an input to modify the distribution from which agents draw their quality of information when tweeting.
         A higher rank value in the dataframe results in a higher probability of creating misinformation.
         This should be intuitive... if someone's sentiment is already high, they are
         more likely to create misinformation. If someone's sentiment is low, they are more likely to produce anti-misinformation.
-
         One potential issue here is if sentiment is tightly clustered for all agents, this will sort of artificially make some agents produce more/less misinformation in that case.
         '''
         all_node_sentiments = nx.get_node_attributes(G, 'sentiment')
@@ -544,7 +540,6 @@ class TopicSim():
     def subset_graph(self, G, communities):
         """
         If communities is not None, only return graph of nodes in communities subset.
-
         param G: input graph
         param communities: list of int
         """
@@ -569,9 +564,7 @@ class TopicSim():
         import networkx as nx
         import random
         '''
-
         Will create a network for simulation using input graph and provided community level attitudes towards topics
-
         :param G: input digraph
         :param perc_nodes_to_use: percentage of nodes from G you want to keep for simulation
         :param numTopics: number of topics in use this simulation round
@@ -583,8 +576,6 @@ class TopicSim():
                                 sentiment value towards topic i.
                                 (this value will be used as mean for drawing distribution)
         :return: returns new network where nodes have impactedness, sentiments, and are bots
-
-
         '''
 
         to_remove = random.sample(list(G.nodes), int(len(G.nodes)*(1-perc_nodes_to_use)))
@@ -692,7 +683,7 @@ def random_community_sample(community_graph, min_network_size=100000, max_networ
         community_sizes = community_sizes[community_sizes >= 10000]
         num_network_nodes = 0
 
-        while num_network_nodes < min_network_size or len(communities) < 2:
+        while num_network_nodes < min_network_size or len(communities) < 3:
             community = int(sample(list(community_sizes.index), 1)[0])
         
             if community_sizes.loc[communities + [community]].sum() < max_network_size and (community not in communities):

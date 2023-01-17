@@ -3,9 +3,10 @@ agg_steps: 3
 num_topics: 4
 claims_to_sample: 4000
 communities:
-- 3
+- 49
 - 43
-- 56
+- 127
+- 120
 community_graph_path: ../../data/community_net.gexf
 depths:
 - 2
