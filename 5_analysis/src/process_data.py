@@ -254,16 +254,18 @@ print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
 
 
 modules = ['no_intervention_']
+mitigation_methods = ['TopPredicted', 'TopPredictedByTopic']
 label_methods = ['random', 'stratified', 'knowledgable_community']
 sample_methods = ['nodes_visited', 'stratified_nodes_visited']
-infile = '../../4_simulation/output/simulation_final_'
+infile = '../../4_simulation/output/simulation_'
 comms = '49_43_127_120' #manually input this for now, we can write an automated finder later
 start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
 regression_outfile = '../output/regression' +  comms
 
 for l in label_methods:
     for s in sample_methods:
-        modules.append('intervention_' + l + '_' + s +'_')
+        for m in mitigation_methods:
+            modules.append('m_' + l + '_' + s +'_')
 
 
 
