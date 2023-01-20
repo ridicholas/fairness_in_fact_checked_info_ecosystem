@@ -9,10 +9,16 @@ import os
 import progressbar
 import time
 import community as community_louvain
-
+import gc
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+def make_comm_string(communities):
+        comm_string = ''
+        for comm in communities:
+            comm_string += '_' + str(comm)
+
+        return comm_string
 
 def induce_graph(G):
     communities = nx.get_node_attributes(G, 'Community')
@@ -78,7 +84,7 @@ def get_network_structure_stats(start_network_path):
     
     
 
-def make_results(infile, reps, modules, communities):
+def make_results_community_level(infile, reps, modules, communities):
 
 
     import TopicSim
@@ -250,32 +256,199 @@ def make_results(infile, reps, modules, communities):
 
 
 
-print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
-
-
-modules = ['no_intervention_']
-mitigation_methods = ['TopPredicted', 'TopPredictedByTopic']
-label_methods = ['random', 'stratified', 'knowledgable_community']
-sample_methods = ['nodes_visited', 'stratified_nodes_visited']
-infile = '../../4_simulation/output/simulation_'
-comms = '49_43_127_120' #manually input this for now, we can write an automated finder later
-start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
-regression_outfile = '../output/regression' +  comms
-
-for l in label_methods:
-    for s in sample_methods:
-        for m in mitigation_methods:
-            modules.append('m_' + l + '_' + s +'_')
 
 
 
-reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile, 
-                                                                                            reps = 5,
-                                                                                            modules = modules,
-                                                                                            communities=comms)
+def process_individual_level_data(reps, modules, labels, sampling, comm_string):
+   
 
-regression.to_pickle(regression_outfile + '.pickle')
-regression.to_csv(regression_outfile + '.csv')
+    import gc
+    gc.enable()
+    
+    regression_data = []
+
+    for rep in range(reps):
+        
+        print('/n/n/n Rep ' + str(rep) + '\n\n\n\n')
+        # Midpoint data
+        
+        pre_path = '../../4_simulation/output/simulation_pre_period_run{}_communities{}.pickle'.format(rep, comm_string)
+        
+        with open(pre_path, 'rb') as file:
+            sim = pickle.load(file)
+            
+        G = sim.G
+        
+        node_dict = {node: {'topic_' + str(topic): {'midpoint_belief':data['sentiment'][topic]} for topic in list(data['sentiment'].keys())} for node, data in G.nodes(data=True)}
+        
+        for node, data in G.nodes(data=True):
+            node_dict[node].update({'betweenness_centrality':data['centrality'], 
+                                    'community':data['Community'], 
+                                    'rep':rep, 
+                                    'kind':data['kind'],
+                                    'out_degree':G.out_degree[node]})
+            
+            # -- 1. collect average per topic belief of nodes followed
+            # -- 2. collect number of bots followed
+            eg = nx.ego_graph(G, node)
+            num_bots_followed = 0
+            for n, d in eg.nodes(data=True):
+                if d['kind'] == 'bot':
+                    num_bots_followed += 1
+                for topic in list(data['sentiment'].keys()):
+                    avg_belief = []
+                    if n == node:
+                        avg_belief.append(0.5)
+                    else:
+                        avg_belief.append(d['sentiment'][topic]) 
+                    node_dict[node]['topic_' + str(topic)].update({'average_external_belief': np.mean(avg_belief)})
+            node_dict[node]['number_bots_followed'] = num_bots_followed
+
+
+                        
+        del G
+        del sim
+        gc.collect()
+        
+        # Post data - No intervention
+        print('No Intervention')
+        
+        p = '../../4_simulation/output/simulation_final_no_intervention_run{}_communities{}.pickle'.format(rep, comm_string)
+        with open(p, 'rb') as file:
+            sim = pickle.load(file)
+        
+        G = sim.G
+        for node, data in G.nodes(data=True):
+            for topic in list(data['sentiment'].keys()):
+                node_dict[node]['topic_' + str(topic)].update({'impactedness': data['impactedness'][topic]})
+                node_dict[node]['topic_' + str(topic)]['intervention'] = {}
+                node_dict[node]['topic_' + str(topic)]['intervention'].update({'no_intervention_change_in_belief': data['sentiment'][topic] - node_dict[node]['topic_'+str(topic)]['midpoint_belief']})
+        del G
+        del sim
+        gc.collect()
+ 
+        
+        # Post data - All interventions
+        
+        for mod in modules:
+            for l in labels:
+                for s in sampling:
+                    p = '../../4_simulation/output/simulation_' + mod + '_' + l + '_' + s + '_' + 'run' + str(rep) + '_communities' + comm_string + '.pickle'
+                    if os.path.isfile(p):
+                        print('Intervention: ' + mod + '_' + l + '_' + s)
+                        with open(p, 'rb') as file:
+                            sim = pickle.load(file)
+                        G = sim.G
+                        for node, data in G.nodes(data=True):
+                            for topic in list(data['sentiment'].keys()):
+                                node_dict[node]['topic_' + str(topic)]['intervention'].update({mod + '_' + l + '_' + s:data['sentiment'][topic] - node_dict[node]['topic_'+str(topic)]['midpoint_belief']})
+                        del G
+                        del sim
+                        gc.collect()
+                        
+
+        for node in list(node_dict.keys()):
+            for topic in list(node_dict[node].keys()):
+                if 'topic' in topic:
+                    for intervention in list(node_dict[node][topic]['intervention'].keys()):
+                        regression_data.append([rep, 
+                                                node, 
+                                                topic,
+                                                intervention,
+                                                node_dict[node]['community'],
+                                                node_dict[node]['kind'],
+                                                node_dict[node]['out_degree'],
+                                                node_dict[node]['number_bots_followed'],
+                                                node_dict[node]['betweenness_centrality'],
+                                                node_dict[node][topic]['impactedness'],
+                                                node_dict[node][topic]['average_external_belief'],
+                                                node_dict[node][topic]['midpoint_belief'],
+                                                node_dict[node][topic]['intervention'][intervention]
+                                                ])
+                        
+        
+    results = pd.DataFrame(regression_data,
+                           columns = ['Rep', 
+                                        'Node', 
+                                        'Topic', 
+                                        'Intervention', 
+                                        'Community', 
+                                        'Kind',
+                                        'Out Degree',
+                                        'Number of Bots Followed',
+                                        'Betweenness Centrality',
+                                        'Impactedness',
+                                        'Average External Belief', 
+                                        'Midpoint Belief', 
+                                        'Change in Belief'])
+    
+    results = results.loc[(results['Kind'] != 'bot')&(results['Out Degree'] > 0)]
+    results.drop(columns = ['Kind', 'Out Degree'], inplace=True)   
+    return results
+               
+                        
+                        
+                                    
+
+                        
+modules = ['TopPredicted', 'TopPredictedByTopic']
+labels = ['random', 'knowledgable_community', 'stratified']
+sampling = ['nodes_visited', 'stratified_nodes_visited']
+reps = 4
+comms = [3, 56, 34, 12, 127, 1, 72, 28, 43]
+comm_string = make_comm_string(comms)
+
+
+     
+results = process_individual_level_data(reps = reps, 
+                                        modules = modules, 
+                                        labels = labels, 
+                                        sampling = sampling, 
+                                        comm_string = comm_string)
+
+
+            
+                    
+results.to_csv('../output/individual_level_regression_data.csv', index = False)
+                    
+        
+        
+            
+            
+            
+        
+ 
+
+        
+
+
+
+
+
+
+# print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
+
+
+# modules = ['no_intervention_']
+# label_methods = ['random', 'stratified', 'knowledgable_community']
+# sample_methods = ['nodes_visited', 'stratified_nodes_visited']
+# infile = '../../4_simulation/output/simulation_final_'
+# comms = '49_43_127_120' #manually input this for now, we can write an automated finder later
+# start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
+# regression_outfile = '../output/regression' +  comms
+
+# for l in label_methods:
+#     for s in sample_methods:
+#         modules.append('intervention_' + l + '_' + s +'_')
+
+
+# reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile, 
+#                                                                                             reps = 5,
+#                                                                                             modules = modules,
+#                                                                                             communities=comms)
+
+# regression.to_pickle(regression_outfile + '.pickle')
+# regression.to_csv(regression_outfile + '.csv')
 
 
 #result.to_pickle('../output/exp_results_information_read_aggregated.pickle')

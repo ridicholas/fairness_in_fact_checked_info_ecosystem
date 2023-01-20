@@ -8,7 +8,7 @@ import sys, getopt
 import networkx as nx
 
 #making sure wd is file directory so hardcoded paths work
-os.chdir(os.path.dirname(os.path.abspath(__file__))) 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def main(argv):
     """
@@ -17,7 +17,7 @@ def main(argv):
     opts, args = getopt.getopt(argv, "p:m:l:s:g")
 
     for opt, arg in opts:
-        if opt == "-m": 
+        if opt == "-m":
             mitigation_method = arg
         elif opt == "-l":
             label_method = arg
@@ -25,28 +25,28 @@ def main(argv):
             sample_method = arg
         elif opt == "-p":
             period = arg
-    
 
-    reps = 2
 
-    
+    reps = 8
+
+
 
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    
 
-    
+
+
     '''
     First topic (row) impacts every group the same, the other topics each impact
     one group significantly more than the others
     '''
 
     if config['random_communities'] and period=='pre':
-        
-        
+
+
         communities = random_community_sample(nx.read_gexf(config['community_graph_path']))
-            
-        
+
+
         config['communities'] = communities
         with open('config.yaml', 'w') as file:
             file.write(yaml.dump(config, default_flow_style=False))
@@ -54,13 +54,13 @@ def main(argv):
 
     else:
         communities = config['communities']
-    
+
     num_topics = len(communities) + 1
 
 
 
-    
-    
+
+
 
     impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
 
@@ -92,13 +92,13 @@ def main(argv):
 
     gc.enable()
 
-    
+
 
     for rep in range(reps):
 
         if period == 'pre':
             print('\n\n ---------- REPETITION #' + str(rep) + 'pre-period -------------- \n\n')
-            
+
             check = Checkworthy(
                 agg_interval = config['agg_interval'],
                 agg_steps = config['agg_steps'],
@@ -122,7 +122,7 @@ def main(argv):
             If create, nodes in network must already have 'Community' attribute
             '''
 
-            if config['load_data'] and not(config['random_communities']): 
+            if config['load_data'] and not(config['random_communities']):
                 sim.load_simulation_network(ready_network_path = config['ready_network_path'])
             else: #no need to recreate network on subsequent reps
                 sim.create_simulation_network(
@@ -130,7 +130,7 @@ def main(argv):
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
                     perc_bots = config['perc_bots']
                 )
-        
+
             # Pass network to Checkworthy object
             check.set_network(G = sim.return_network(), communities=sim.return_communities())
             # reset checkworthy object object
@@ -186,13 +186,13 @@ def main(argv):
 
                 check_pre = sim.return_check()
 
-                
+
                 print('\n\n\n ----------- Sampling Claims for Checkworthy Dataset --------- \n\n')
                 check_pre.sample_claims(num_to_sample=config['claims_to_sample'], sample_method=sample_method)
-                
+
                 print('\n\n\n ----------- Random Sampling of Labels for Checkworthy Dataset --------- \n\n')
                 check_pre.sample_labels_for_claims(labels_per_claim = config['nodes_to_sample'], sample_method = label_method)
-                
+
                 print('\n\n\n ----------- Training Model with Label = average_truth_perception_random --------- \n\n')
 
                 check_pre.train_model(label_to_use='average_truth_perception_{}'.format(label_method))
@@ -215,22 +215,10 @@ def main(argv):
                 gc.collect()
 
 
-        
+
         else:
             print('invalid period')
 
 
 if __name__ == "__main__":
    main(sys.argv[1:])
-        
-
-    
-
-
-
-    
-
-
-
-
-

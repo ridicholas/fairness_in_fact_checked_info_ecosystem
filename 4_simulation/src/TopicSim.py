@@ -30,7 +30,7 @@ class TopicSim():
         self.set_comm_string()
         self.start_network_path = ''
         self.rep = rep
-        
+
 
     def set_impactedness(self, impactedness):
         self.impactedness = impactedness
@@ -49,13 +49,13 @@ class TopicSim():
 
     def return_check(self):
         return self.check
-    
+
     def return_communities(self):
         return self.communities
 
     def set_post_duration(self, post_duration):
         self.post_duration = post_duration
-    
+
     def set_start_network_path(self, path):
         self.start_network_path = path
 
@@ -71,15 +71,18 @@ class TopicSim():
         import pickle
         with open(ready_network_path, "rb") as f:
             self.G = pickle.load(f)
-        
+
         self.set_start_network_path(ready_network_path)
-        
-       
+
+
 
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
-    def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots):
-        G = nx.read_gpickle(raw_network_path)
+    def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots, filetype='gexf'):
+        if filetype == 'gexf':
+            G = nx.read_gexf(raw_network_path)
+        elif filetype == 'gpickle':
+            G = nx.read_gpickle(raw_network_path)
         subG = self.subset_graph(G, communities=self.communities)
         sampleG = self.set_node_attributes(G=subG,
                                            perc_nodes_to_use = perc_nodes_to_subset,
@@ -88,11 +91,11 @@ class TopicSim():
                                            impactednesses = self.impactedness,
                                            sentiments = self.beliefs)
         self.G = sampleG
-        
+
 
         self.start_network_path = '../output/simulation_net_run{}_communities{}.gpickle'.format(self.rep, self.comm_string)
         nx.write_gpickle(self.G, self.start_network_path)
-        
+
 
 
 
@@ -123,11 +126,11 @@ class TopicSim():
             # Captures which tweets read by each community (aggregate) seperated by topic (used for plots)
             community_read_tweets_by_type = {com:{t:{topic:{'misinfo': 0, 'noise': 0, 'anti-misinfo': 0} for topic in range(self.num_topics)} for t in range(self.runtime)} for com in self.communities}
             # Which tweets has a node read? Used to prevent multiple readings of the same tweets.
-            node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}            
+            node_read_tweets_by_time = {node:{t: [] for t in range(self.runtime)} for node in nodes}
             #a1, a2, a3 determine spread of distribution of utterances per topic for each type of info (misinfo, noise, anti-misinfo)
             all_claims, utterance_virality = self.create_claims(num_claims = self.num_claims)
             community_checked_tweets_by_type = {}
-            
+
 
         elif period == 'post':
 
@@ -155,8 +158,8 @@ class TopicSim():
         fact_checked = []
         for step in bar(time):
                 # Loop over all nodes
-                
-                
+
+
             '''
             Update fact-checking algorithm with new data
             '''
@@ -170,7 +173,7 @@ class TopicSim():
                 preds.sort_values(ascending=False, inplace=True)
                 fact_checked = fact_checked + list(preds.index[0:fact_checks_per_step])
                 fact_checked = [*set(fact_checked)]
-                
+
             elif period == 'post' and mitigation_type == 'TopPredictedByTopic':
             ##for each time step, determine which claims to fact check using classifier
                 check_df = pd.DataFrame.from_dict(self.check.checkworthy_data).T.fillna(0)
@@ -178,7 +181,7 @@ class TopicSim():
                 x = x[check.cols_when_model_builds]
                 x['preds'] = check.clf.predict(x)*check.reg.predict(x)
                 preds = x[["preds", "topic"]]
-                preds = preds.drop(fact_checked)                
+                preds = preds.drop(fact_checked)
 
                 for tpc in range(self.num_topics):
                     preds.sort_values(by = ['preds'], ascending=False, inplace=True)
@@ -362,7 +365,7 @@ class TopicSim():
                                                                                             info_type = value,
                                                                                             com = data['Community'],
                                                                                             step = step)
-                        
+
                         '''
                         retweet and capture data about cascades of re-tweets
                         '''
@@ -387,7 +390,7 @@ class TopicSim():
                 for topic in range(self.num_topics):
                     community_sentiment_through_time[data['Community']][step][topic].append(data['sentiment'][topic])
 
-        
+
         if period == 'pre':
             self.all_info = all_info
             self.node_read_tweets_by_time = node_read_tweets_by_time
@@ -399,7 +402,7 @@ class TopicSim():
             self.node_read_tweets = 'Removed for light storage'
             self.node_read_tweets_by_time = 'Removed for light storage'
             self.all_claims = 'Removed for light storage'
-        
+
         # These objects are used in process_data.py
         check.set_network(G=G, communities=self.communities)
         self.G = G
@@ -407,9 +410,9 @@ class TopicSim():
         self.community_sentiment_through_time = community_sentiment_through_time
         self.community_read_tweets_by_type = community_read_tweets_by_type
         self.community_checked_tweets_by_type = community_checked_tweets_by_type
-        
 
-        
+
+
 
     def choose_topic(self, data):
         topic_probs = [i / sum(data['impactedness'].values()) for i in data['impactedness'].values()]
@@ -453,7 +456,7 @@ class TopicSim():
                 return 1 + np.random.beta(a=1, b=17, size=1)[0]
             else:
                 return 1.5 + np.random.beta(a=5, b=17,size=1)[0]
-            
+
         def choice_prob_func(x, info):
             # This control probability of starting a cascade ("utterance") about a claim.
             # anti-misinformation cascades distribution has fatter tails than misinformation, thus a1 > a3
@@ -463,7 +466,7 @@ class TopicSim():
                 return softmax(9*x**2)
             else:
                 return softmax(9*x**1)
-    
+
         claims = pd.DataFrame(data=[i for i in range(num_claims)], columns = ['claim_id'])
         claims['type'] = claims['claim_id'].apply(type_func)
         claims['virality'] = claims['type'].apply(virality_func)
@@ -476,7 +479,7 @@ class TopicSim():
            tmp.loc[:,'utterance_virality'] = choice_prob_func(x=tmp['virality'].values,info=types[i])
            probs = tmp['utterance_virality'].values / sum(tmp['utterance_virality'].values)
            utterance_virality.update({keys[i]:probs})
-        
+
         c = claims.set_index('claim_id')
         c_dict = c.to_dict('index')
         return c_dict, utterance_virality
@@ -496,16 +499,16 @@ class TopicSim():
         '''
         all_node_sentiments = nx.get_node_attributes(G, 'sentiment')
         node_sentiments = [[key, all_node_sentiments[key][topic], topic] for key in all_node_sentiments.keys() for topic in topics]
-        
+
         sentiments = pd.DataFrame(node_sentiments, columns = ['node', 'sentiment', 'topic']).sort_values(by=['topic', 'node'])
-        
+
         median_sentiment = np.median(sentiments.sentiment.to_list())
         deviations = [np.absolute(i - median_sentiment) for i in sentiments.sentiment.to_list()]
         sentiments['deviations'] = deviations
         sentiments['rank'] = np.where(sentiments['sentiment'] < median_sentiment,
                                                      -1*sentiments['deviations'].rank(method='max')/len(sentiments),
                                                      sentiments['deviations'].rank(method='max')/len(sentiments))
-        
+
         sentiments_wide = pd.pivot(sentiments, index='node', columns = 'topic', values = 'rank').to_dict(orient='index')
 
         return sentiments_wide
@@ -660,7 +663,7 @@ class TopicSim():
         return community_read_tweets_by_type
 
 
-   
+
 
     def percentile(self, x):
         import numpy as np
@@ -685,11 +688,11 @@ def random_community_sample(community_graph, min_network_size=100000, max_networ
 
         while num_network_nodes < min_network_size or len(communities) < 3:
             community = int(sample(list(community_sizes.index), 1)[0])
-        
+
             if community_sizes.loc[communities + [community]].sum() < max_network_size and (community not in communities):
                 communities.append(community)
                 num_network_nodes += community_sizes[community]
-        
+
 
         return communities
 
