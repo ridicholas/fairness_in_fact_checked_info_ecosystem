@@ -442,7 +442,6 @@ results.to_csv('../output/individual_level_regression_data.csv', index = False)
 #         modules.append('intervention_' + l + '_' + s +'_')
 
 
-
 # reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile, 
 #                                                                                             reps = 5,
 #                                                                                             modules = modules,
