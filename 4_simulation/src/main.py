@@ -27,13 +27,16 @@ def main(argv):
             period = arg
 
 
-    reps = 8
 
 
 
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
+
+
+
+    reps = config['reps']
 
 
     '''
@@ -55,41 +58,79 @@ def main(argv):
     else:
         communities = config['communities']
 
-    num_topics = len(communities) + 1
+    
+    if config['state_of_world'] == 1:
+        
+        num_topics = len(communities) + 1
+    
+        impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+    
+        for i in range(1, len(impactednesses)):
+            keys = list(impactednesses[i].keys())
+            for key in impactednesses[i].keys():
+                if key == keys[i-1]:
+                    impactednesses[i][key] = config['high_impactedness'][config['state_of_world']-1]
+                else:
+                    impactednesses[i][key] = config['low_impactedness'][config['state_of_world']-1]
+    
+    
+        '''
+        For the first topic (which everyone cares about equally), belief is roughly average (50%).
+        For the other topics, if a community is more impacted by a topic, we assume that their
+        average belief is lower, indicating that they have more knowledge of the truth than the
+        other communities that are not impacted  by the topic.
+        '''
+    
+        beliefs = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+    
+        for i in range(1, len(beliefs)):
+            keys = list(beliefs[i].keys())
+            for key in beliefs[i].keys():
+                if key == keys[i-1]:
+                    beliefs[i][key] = config['low_belief'][config['state_of_world']-1]
+                else:
+                    beliefs[i][key] = config['high_belief'][config['state_of_world']-1]
+                    
+    elif config['state_of_world'] == 2:
+        
+        num_topics = len(communities) - 1
+        
+        
+        '''
+        This is a world where there exist N groups, and N - 1 topics. A majority and minority community are impacted differently
+        by each topic. A minority knowledgeable community is impacted equally by both topics.
+        '''
+        
+        
+        impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+        for com in range(len(communities)):
+            for i in range(num_topics):
+                if com == i:
+                    impactednesses[i][communities[com]] = config['high_impactedness'][config['state_of_world']-1]
+                elif com == (len(communities)-1):
+                    impactednesses[i][communities[com]] = config['middle_impactedness']
+                else:
+                    impactednesses[i][communities[com]] = config['low_impactedness'][config['state_of_world']-1]
 
+    
+    
+        '''
+        In this construct, both the minority and majority communities are equally unknowledgable, and there exists
+        one knowledgeable minority community about all topics (a little unrealistic, but demonstrates the concept).
+        '''
+    
+        beliefs = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
+    
+        for com in range(len(communities)):
+            for i in range(num_topics):
+                if com == (len(communities)-1):
+                    beliefs[i][communities[com]] = config['low_belief'][config['state_of_world']-1]
+                else:
+                    beliefs[i][communities[com]] = config['high_belief'][config['state_of_world']-1]
 
-
-
-
-
-    impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
-
-    for i in range(1, len(impactednesses)):
-        keys = list(impactednesses[i].keys())
-        for key in impactednesses[i].keys():
-            if key == keys[i-1]:
-                impactednesses[i][key] = config['high_impactedness']
-            else:
-                impactednesses[i][key] = config['low_impactedness']
-
-
-    '''
-    For the first topic (which everyone cares about equally), belief is roughly average (50%).
-    For the other topics, if a community is more impacted by a topic, we assume that their
-    average belief is lower, indicating that they have more knowledge of the truth than the
-    other communities that are not impacted  by the topic.
-    '''
-
-    beliefs = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
-
-    for i in range(1, len(beliefs)):
-        keys = list(beliefs[i].keys())
-        for key in beliefs[i].keys():
-            if key == keys[i-1]:
-                beliefs[i][key] = config['low_belief']
-            else:
-                beliefs[i][key] = config['high_belief']
-
+        
+   
+    
     gc.enable()
 
 
