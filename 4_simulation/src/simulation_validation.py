@@ -84,11 +84,13 @@ def calculate_ccdf(results_frame):
     return ccdf_frame
 
 
-infile = '../output/simulation_pre_period0.pickle'
+infile = '../output/simulation_pre_period_run0_communities_3_34_72.pickle'
 with open(infile, 'rb') as file:
     sim = pickle.load(file)
 
-n_sample = 4000000
+all_info = sim.all_info
+
+n_sample = 1500000
 random_keys = np.random.choice(list(sim.all_info), size = n_sample, replace = False)
 
 
