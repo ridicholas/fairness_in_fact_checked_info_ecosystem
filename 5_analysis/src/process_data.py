@@ -84,7 +84,7 @@ def get_network_structure_stats(start_network_path):
     
     
 
-def make_results_community_level(infile, reps, modules, communities):
+def make_results_community_level(infile, reps, paths, communities, comm_list, community_features=False):
 
 
     import TopicSim
@@ -104,12 +104,12 @@ def make_results_community_level(infile, reps, modules, communities):
     checks = {}
     beliefs = {}
 
-    
 
     for rep in range(reps):
 
-        start_path = '../../4_simulation/output/simulation_net_run{}_communities_{}.gpickle'.format(rep, comms)
-        stats, comm_list = get_network_structure_stats(start_path)
+        start_path = '../../4_simulation/output/simulation_net_run{}_communities{}.gpickle'.format(rep, communities)
+        if community_features:
+            stats, comm_list = get_network_structure_stats(start_path)
 
         print('\n\n\n\n\n Processing Reads Data - Repetition #' + str(rep) + '------ \n\n\n\n')
 
@@ -117,7 +117,9 @@ def make_results_community_level(infile, reps, modules, communities):
         checks[rep] = {}
         beliefs[rep] = {}
 
-        for mod in modules:
+        for path in paths:
+
+            mod = path.replace('../../4_simulation/output/simulation_', '')
 
             reads[rep][mod] = {}
             checks[rep][mod] = {}
@@ -126,7 +128,7 @@ def make_results_community_level(infile, reps, modules, communities):
 
 
             
-            with open(infile + mod + 'run' + str(rep) + '_communities_' + communities + '.pickle', 'rb') as file:
+            with open(path + 'run' + str(rep) + '_communities' + comms + '.pickle', 'rb') as file:
                 sim = pickle.load(file)
             
             
@@ -168,61 +170,61 @@ def make_results_community_level(infile, reps, modules, communities):
 
             del sim
             gc.collect()
-
-            for community in comm_list:
-                for topic in topics:
-                    regression.loc[i, ['run', 
-                                       'mod', 
-                                       'community', 
-                                       'topic', 
-                                       'impactedness', 
-                                       'start_belief',
-                                       'change_in_belief',
-                                       'misinfo_read',
-                                       'anti_misinfo_read',
-                                       'noise_read',
-                                       'misinfo_checked',
-                                       'anti_misinfo_checked',
-                                       'noise_checked', 
-                                       'size', 
-                                       'perc_of_net', 
-                                       'avg_degree_within_graph', 
-                                       'avg_degree_within_community', 
-                                       'density', 
-                                       'cluster_coef', 
-                                       'average_centrality_of_nodes', 
-                                       'comm_centrality', 
-                                       'perc_of_largest', 
-                                       'ratio_connections_self_to_largest_self', 
-                                       'ratio_connections_self_to_largest_largest']] = [rep,
-                                                           mod, 
-                                                           community, 
-                                                           topic, 
-                                                           impactedness[topic][community], 
-                                                           start_beliefs[topic][community],
-                                                           beliefs[rep][mod][community][topic][299] - beliefs[rep][mod][community][topic][100],
-                                                           sum(reads[rep][mod][community][topic]['misinfo'].values()),
-                                                           sum(reads[rep][mod][community][topic]['anti-misinfo'].values()),
-                                                           sum(reads[rep][mod][community][topic]['noise'].values()),
-                                                           sum(checks[rep][mod][community][topic]['misinfo'].values()),
-                                                           sum(checks[rep][mod][community][topic]['anti-misinfo'].values()),
-                                                           sum(checks[rep][mod][community][topic]['noise'].values()), 
-                                                           stats[community]['size'], 
-                                                           stats[community]['perc_of_network'],
-                                                           stats[community]['avg_degree_graph'],
-                                                           stats[community]['avg_degree_within_community'],
-                                                           stats[community]['density'],
-                                                           stats[community]['cluster_coef'],
-                                                           stats[community]['average_centrality_of_nodes'],
-                                                           stats[community]['comm_centrality'],
-                                                           stats[community]['perc_of_largest'],
-                                                           stats[community]['ratio_connections_self_to_largest_self'],
-                                                           stats[community]['ratio_connections_self_to_largest_largest']]
-                    
-                    
-                                                                          
-
-                    i+=1
+            if community_features:
+                for community in comm_list:
+                    for topic in topics:
+                        regression.loc[i, ['run', 
+                                           'mod', 
+                                           'community', 
+                                           'topic', 
+                                           'impactedness', 
+                                           'start_belief',
+                                           'change_in_belief',
+                                           'misinfo_read',
+                                           'anti_misinfo_read',
+                                           'noise_read',
+                                           'misinfo_checked',
+                                           'anti_misinfo_checked',
+                                           'noise_checked', 
+                                           'size', 
+                                           'perc_of_net', 
+                                           'avg_degree_within_graph', 
+                                           'avg_degree_within_community', 
+                                           'density', 
+                                           'cluster_coef', 
+                                           'average_centrality_of_nodes', 
+                                           'comm_centrality', 
+                                           'perc_of_largest', 
+                                           'ratio_connections_self_to_largest_self', 
+                                           'ratio_connections_self_to_largest_largest']] = [rep,
+                                                               mod, 
+                                                               community, 
+                                                               topic, 
+                                                               impactedness[topic][community], 
+                                                               start_beliefs[topic][community],
+                                                               beliefs[rep][mod][community][topic][299] - beliefs[rep][mod][community][topic][100],
+                                                               sum(reads[rep][mod][community][topic]['misinfo'].values()),
+                                                               sum(reads[rep][mod][community][topic]['anti-misinfo'].values()),
+                                                               sum(reads[rep][mod][community][topic]['noise'].values()),
+                                                               sum(checks[rep][mod][community][topic]['misinfo'].values()),
+                                                               sum(checks[rep][mod][community][topic]['anti-misinfo'].values()),
+                                                               sum(checks[rep][mod][community][topic]['noise'].values()), 
+                                                               stats[community]['size'], 
+                                                               stats[community]['perc_of_network'],
+                                                               stats[community]['avg_degree_graph'],
+                                                               stats[community]['avg_degree_within_community'],
+                                                               stats[community]['density'],
+                                                               stats[community]['cluster_coef'],
+                                                               stats[community]['average_centrality_of_nodes'],
+                                                               stats[community]['comm_centrality'],
+                                                               stats[community]['perc_of_largest'],
+                                                               stats[community]['ratio_connections_self_to_largest_self'],
+                                                               stats[community]['ratio_connections_self_to_largest_largest']]
+                        
+                        
+                                                                              
+    
+                        i+=1
             
             
 
@@ -251,8 +253,10 @@ def make_results_community_level(infile, reps, modules, communities):
 
     
 
-
-    return reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression
+    if community_features:
+        return reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression
+    else:
+        return reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks
 
 
 
@@ -269,7 +273,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
 
     for rep in range(reps):
         
-        print('/n/n/n Rep ' + str(rep) + '\n\n\n\n')
+        print('\n\n\n Rep ' + str(rep) + '\n\n\n\n')
         # Midpoint data
         
         pre_path = '../../4_simulation/output/simulation_pre_period_run{}_communities{}.pickle'.format(rep, comm_string)
@@ -279,6 +283,10 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
             
         G = sim.G
         
+        print('Calculating Clustering Coefficient for whole graph')
+        cluster = nx.clustering(G)
+        print('Finished Calculating Clustering coefficient!')
+        
         node_dict = {node: {'topic_' + str(topic): {'midpoint_belief':data['sentiment'][topic]} for topic in list(data['sentiment'].keys())} for node, data in G.nodes(data=True)}
         
         for node, data in G.nodes(data=True):
@@ -286,15 +294,19 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                     'community':data['Community'], 
                                     'rep':rep, 
                                     'kind':data['kind'],
-                                    'out_degree':G.out_degree[node]})
+                                    'out_degree':G.out_degree[node],
+                                    'clustering':cluster[node]})
             
             # -- 1. collect average per topic belief of nodes followed
             # -- 2. collect number of bots followed
             eg = nx.ego_graph(G, node)
             num_bots_followed = 0
+            num_in_other_communities_followed = 0
             for n, d in eg.nodes(data=True):
                 if d['kind'] == 'bot':
                     num_bots_followed += 1
+                if d['Community'] != data['Community']:
+                    num_in_other_communities_followed += 1
                 for topic in list(data['sentiment'].keys()):
                     avg_belief = []
                     if n == node:
@@ -303,6 +315,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                         avg_belief.append(d['sentiment'][topic]) 
                     node_dict[node]['topic_' + str(topic)].update({'average_external_belief': np.mean(avg_belief)})
             node_dict[node]['number_bots_followed'] = num_bots_followed
+            node_dict[node]['number_followed_in_other_comms'] = num_in_other_communities_followed
 
 
                         
@@ -360,6 +373,8 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                                 node_dict[node]['out_degree'],
                                                 node_dict[node]['number_bots_followed'],
                                                 node_dict[node]['betweenness_centrality'],
+                                                node_dict[node]['clustering'],
+                                                node_dict[node]['number_followed_in_other_comms'],
                                                 node_dict[node][topic]['impactedness'],
                                                 node_dict[node][topic]['average_external_belief'],
                                                 node_dict[node][topic]['midpoint_belief'],
@@ -377,6 +392,8 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                         'Out Degree',
                                         'Number of Bots Followed',
                                         'Betweenness Centrality',
+                                        'Clustering',
+                                        'Number Followed in Other Comms',
                                         'Impactedness',
                                         'Average External Belief', 
                                         'Midpoint Belief', 
@@ -394,8 +411,8 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
 modules = ['TopPredicted', 'TopPredictedByTopic']
 labels = ['random', 'knowledgable_community', 'stratified']
 sampling = ['nodes_visited', 'stratified_nodes_visited']
-reps = 4
-comms = [3, 56, 34, 12, 127, 1, 72, 28, 43]
+reps = 10
+comms = [43, 56, 127]
 comm_string = make_comm_string(comms)
 
 
@@ -426,30 +443,38 @@ results.to_csv('../output/individual_level_regression_data.csv', index = False)
 
 
 
-# print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
+print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
 
 
-# modules = ['no_intervention_']
-# label_methods = ['random', 'stratified', 'knowledgable_community']
-# sample_methods = ['nodes_visited', 'stratified_nodes_visited']
-# infile = '../../4_simulation/output/simulation_final_'
-# comms = '49_43_127_120' #manually input this for now, we can write an automated finder later
-# start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
-# regression_outfile = '../output/regression' +  comms
+modules = ['TopPredicted', 'TopPredictedByTopic']
+label_methods = ['random', 'stratified', 'knowledgable_community']
+sample_methods = ['nodes_visited', 'stratified_nodes_visited']
+infile = '../../4_simulation/output/simulation_'
+comms = '_43_56_127' #manually input this for now, we can write an automated finder later
+comm_list = [43, 56, 127]
+start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
+regression_outfile = '../output/regression' +  comms
+readFrame_outfile = '../output/misinfo_reads' + comms
+beliefFrame_outfile = '../output/belief_results' + comms
+reps = 10
 
-# for l in label_methods:
-#     for s in sample_methods:
-#         modules.append('intervention_' + l + '_' + s +'_')
+paths = []
+
+paths.append('../../4_simulation/output/simulation_final_no_intervention_')
+for mod in modules:
+    for l in label_methods:
+        for s in sample_methods:
+            p = '../../4_simulation/output/simulation_' + mod + '_' + l + '_' + s + '_' 
+            paths.append(p)
 
 
 
-# reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results(infile=infile, 
-#                                                                                             reps = 5,
-#                                                                                             modules = modules,
-#                                                                                             communities=comms)
+reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks = make_results_community_level(infile=infile, 
+                                                                                                reps = reps,
+                                                                                                paths = paths,
+                                                                                                communities=comms,
+                                                                                                comm_list=comm_list)
 
-# regression.to_pickle(regression_outfile + '.pickle')
-# regression.to_csv(regression_outfile + '.csv')
+reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
+beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
 
-
-#result.to_pickle('../output/exp_results_information_read_aggregated.pickle')

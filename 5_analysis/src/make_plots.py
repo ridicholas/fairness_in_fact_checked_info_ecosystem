@@ -82,77 +82,97 @@ def plot_total_reads_over_time(midpoint, mitigation, file, by_community=False,sp
 
 '''
 
-def plot_total_misinfo_reads_over_time(midpoint, smooth_interval = 25):
+def plot_total_misinfo_reads_over_time(file, midpoint, mods_to_include, smooth_interval = 25):
     
     
     
-    colors = {'No Intervention':'black', 'Random Label - Top View Sampling - Standard Mitigation':'darkred', 'KC Label - Strat. Top View Sampling - Topic Mitigation':'orange'}  
+    colors = {'No Intervention':'black', '(Baseline) Random Label - Top View Sampling - Standard Mitigation':'darkred', 'KC Label - Strat. Top View Sampling - Topic Mitigation':'blue'}  
 
-    reads_over_time = pd.read_pickle('../output/exp_results_information_read_aggregated.pickle')
-    reads_over_time = reads_over_time.sort_values(by=['Community', 'Topic', 'Type', 'Intervention', 'Step'])
-    reads_over_time['Intervention'] = np.where(reads_over_time['Intervention'] == 'no_intervention', 'No Intervention',
-                                               np.where(reads_over_time['Intervention']=='intervention_kc_label_stratified_sample_topic_mitigation', 'KC Label - Strat. Top View Sampling - Topic Mitigation',
-                                                        np.where(reads_over_time['Intervention']=='intervention_random_label_random_sample_standard_mitigation', 'Random Label - Top View Sampling - Standard Mitigation', 'Community Stratified Label')))
+    reads_over_time = pd.read_csv(file)
+    reads_over_time = reads_over_time.loc[(reads_over_time['Mod'].isin(mods_to_include))]
+    reads_over_time = reads_over_time.sort_values(by=['Community', 'Topic', 'Info_Type', 'Mod', 'Time'])
+    reads_over_time['Mod'] = np.where(reads_over_time['Mod'] == 'final_no_intervention_', 'No Intervention',
+                                               np.where(reads_over_time['Mod']=='TopPredictedByTopic_knowledgable_community_stratified_nodes_visited_', 'KC Label - Strat. Top View Sampling - Topic Mitigation',
+                                                        np.where(reads_over_time['Mod']=='TopPredicted_random_nodes_visited_', '(Baseline) Random Label - Top View Sampling - Standard Mitigation', 'Community Stratified Label')))
     
     
     reads_over_time['Topic'] = 'Topic ' + reads_over_time['Topic'].astype(int).apply(str)
     reads_over_time['Community'] = 'Community ' + reads_over_time['Community'].astype(int).apply(str)
 
     
-    reads_over_time_mean = reads_over_time.groupby(by=['Community', 'Topic', 'Type', 'Intervention', 'Step']).\
-        agg(mean_reads=pd.NamedAgg(column='Reads', aggfunc='mean')).reset_index()
+    reads_over_time_mean = reads_over_time.groupby(by=['Community', 'Topic', 'Info_Type', 'Mod', 'Time']).\
+        agg(mean_reads=pd.NamedAgg(column='reads', aggfunc='mean')).reset_index()
     
-    reads_over_time_mean['Reads (moving average)'] = reads_over_time_mean.groupby(['Type','Community','Intervention', 'Topic'])['mean_reads'].transform(lambda x: x.rolling(smooth_interval, 1).mean())
+    reads_over_time_mean['Reads (Cumulative)'] = reads_over_time_mean.groupby(['Info_Type','Community','Mod', 'Topic'])['mean_reads'].transform(pd.Series.cumsum)
+
+
 
     
     # 1. Community + Topic Breakdown of Misinfo read across trials.
     reads_over_time_misinfo = reads_over_time_mean\
-        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 10)]
+        .loc[(reads_over_time_mean['Info_Type']=='misinfo')]
 
 
-    plt=(ggplot(reads_over_time_misinfo, aes(x='Step',y='Reads (moving average)', color = 'Intervention'))
+    plt=(ggplot(reads_over_time_misinfo, aes(x='Time',y='Reads (Cumulative)', color = 'Mod'))
                  + geom_line()
-                 + facet_wrap('~ Community + Topic')
+                 + facet_wrap('~ Community + Topic', scales = 'free_y')
                  + ggtitle('Misinformation Read By Community')
                  + scale_color_manual(values=colors)
                  + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
 
     output = '../output/misinfo_reads_results.png'
-    plt.save(filename=output, width=16,height=6)
+    plt.save(filename=output, width=16,height=6, dpi=1000)
     
     # 2. Topic Breakdown of Misinfo read across trials.
 
     reads_over_time_topic = reads_over_time_mean\
-        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]\
-            .groupby(['Intervention', 'Topic', 'Step'])\
-                .agg(Reads=pd.NamedAgg(column='Reads (moving average)', aggfunc='mean')).reset_index()
+        .loc[(reads_over_time_mean['Info_Type']=='misinfo')]\
+            .groupby(['Mod', 'Topic', 'Time'])\
+                .agg(Reads=pd.NamedAgg(column='Reads (Cumulative)', aggfunc='sum')).reset_index()
     
-    plt=(ggplot(reads_over_time_topic, aes(x='Step',y='Reads', color = 'Intervention'))
+    plt=(ggplot(reads_over_time_topic, aes(x='Time',y='Reads', color = 'Mod'))
                  + geom_line()
                  + facet_wrap('Topic')
                  + ggtitle('Misinformation Read By Topic')
+                 + ylab('Reads (Cumulative)')
                  + scale_color_manual(values=colors)
                  + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
 
     output = '../output/misinfo_reads_topic_results.png'
-    plt.save(filename=output, width=10,height=6)
+    plt.save(filename=output, width=10,height=6, dpi=1000)
 
 
     #3. Community Breakdown of Misinfo read across trials
     reads_over_time_comm = reads_over_time_mean\
-        .loc[(reads_over_time_mean['Type']=='misinfo') & (reads_over_time_mean['Step'] > 25)]\
-            .groupby(['Intervention', 'Community', 'Step'])\
-                .agg(Reads=pd.NamedAgg(column='Reads (moving average)', aggfunc='mean')).reset_index()
+        .loc[(reads_over_time_mean['Info_Type']=='misinfo')]\
+            .groupby(['Mod', 'Community', 'Time'])\
+                .agg(Reads=pd.NamedAgg(column='Reads (Cumulative)', aggfunc='sum')).reset_index()
     
-    plt=(ggplot(reads_over_time_comm, aes(x='Step',y='Reads', color = 'Intervention'))
+    plt=(ggplot(reads_over_time_comm, aes(x='Time',y='Reads', color = 'Mod'))
                  + geom_line()
                  + facet_wrap('Community')
                  + ggtitle('Misinformation Read By Community')
+                 + ylab('Reads (Cumulative)')
                  + scale_color_manual(values=colors)
                  + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
 
     output = '../output/misinfo_reads_comm_results.png'
-    plt.save(filename=output, width=16,height=6)
+    plt.save(filename=output, width=16,height=6, dpi=1000)
+    
+    #4. Total breakdown of Misinfo Read Across the Network
+    reads_over_time_total = reads_over_time_mean\
+        .loc[(reads_over_time_mean['Info_Type']=='misinfo')]\
+            .groupby(['Mod', 'Time'])\
+                .agg(Reads=pd.NamedAgg(column='Reads (Cumulative)', aggfunc='sum')).reset_index()
+
+    plt=(ggplot(reads_over_time_total, aes(x='Time',y='Reads', color = 'Mod'))
+                 + geom_line()
+                 + ggtitle('Misinformation Read Across Network')
+                 + scale_color_manual(values=colors)
+                 + geom_vline(aes(xintercept = midpoint), color = 'green', linetype = 'dashed'))
+
+    output = '../output/misinfo_reads_total_results.png'
+    plt.save(filename=output, width=10,height=6, dpi=1000)
 
 
 
@@ -162,6 +182,7 @@ def make_community_sentiment_plot(midpoint, smooth_interval = 25):
     
     
     colors = {'No Intervention':'black', 'Random Label - Top View Sampling - Standard Mitigation':'darkred', 'KC Label - Strat. Top View Sampling - Topic Mitigation':'orange'}  
+
 
     community_sentiment = pd.read_csv('../output/exp_results_community_belief.csv')
     community_sentiment['Intervention'] = np.where(community_sentiment['Intervention'] == 'no_intervention', 'No Intervention',
@@ -229,5 +250,7 @@ def make_community_sentiment_plot(midpoint, smooth_interval = 25):
     plt.save(filename='../output/mean_belief_no_intervention.png', width = 12, height = 6)
 
 
-plot_total_misinfo_reads_over_time(midpoint = 100)
+plot_total_misinfo_reads_over_time(file = '../output/misinfo_reads_43_56_127.csv', 
+                                   mods_to_include = ['final_no_intervention_', 'TopPredictedByTopic_knowledgable_community_stratified_nodes_visited_', 'TopPredicted_random_nodes_visited_'],
+                                   midpoint = 150)
 make_community_sentiment_plot(midpoint = 100)
