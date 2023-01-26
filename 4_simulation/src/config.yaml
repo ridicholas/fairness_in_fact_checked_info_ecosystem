@@ -1,19 +1,19 @@
 reps: 10
 agg_interval: 3
 agg_steps: 3
-claims_to_sample: 10000
+claims_to_sample: 1000
+# if running state 2, put your intended knowledgeable community in last position
 communities:
 - 3
 - 34
 - 72
-community_graph_path: ../../data/community_net.gexf
 depths:
 - 2
 - 4
 - 6
-fact_checks_per_step: 80
+fact_checks_per_step: 20
 high_belief: 
-- 0.6
+- 0.7
 - 0.7
 low_belief: 
 - 0.4
@@ -29,19 +29,16 @@ high_impactedness:
 middle_impactedness: 0.5
 min_degree: 1
 nodes_to_sample: 30
-num_claims: 18000
-output_sim_final_intervention_kc: ../output/simulation_final_intervention_kc_label_stratified_sample_topic_mitigation
-output_sim_final_intervention_random: ../output/simulation_final_intervention_random_label_random_sample_standard_mitigation
-output_sim_final_intervention_stratified: ../output/simulation_final_intervention_stratified_label
-output_sim_final_no_intervention: ../output/simulation_final_no_intervention
-output_sim_midpoint: ../output/simulation_pre_period
+num_claims: 10000
 perc_bots: 0.1
-perc_nodes_to_subset: 0.2
-post_duration: 2
+perc_nodes_to_subset: 0.15
+post_duration: 3
 random_communities: False
-raw_network_path: ../../data/nodes_with_community.gexf
-ready_network_path: ../output/simulation_net_communities_3_43_56.gpickle
-runtime: 100
-sample_method: stratified_nodes_visited
+runtime: 150
 update_beliefs: true
 state_of_world: 2
+output_sim_final_no_intervention: ../output/simulation_final_no_intervention
+output_sim_midpoint: ../output/simulation_pre_period
+raw_network_path: ../../data/nodes_with_community.gexf
+ready_network_path: ../output/simulation_net_communities_3_43_56.gpickle
+community_graph_path: ../../data/community_net.gexf
