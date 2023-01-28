@@ -412,7 +412,7 @@ modules = ['TopPredicted', 'TopPredictedByTopic']
 labels = ['random', 'knowledgable_community', 'stratified']
 sampling = ['nodes_visited', 'stratified_nodes_visited']
 reps = 10
-comms = [43, 56, 127]
+comms = [3, 34, 72]
 comm_string = make_comm_string(comms)
 
 
@@ -450,8 +450,8 @@ modules = ['TopPredicted', 'TopPredictedByTopic']
 label_methods = ['random', 'stratified', 'knowledgable_community']
 sample_methods = ['nodes_visited', 'stratified_nodes_visited']
 infile = '../../4_simulation/output/simulation_'
-comms = '_43_56_127' #manually input this for now, we can write an automated finder later
-comm_list = [43, 56, 127]
+comms = '_3_34_72' #manually input this for now, we can write an automated finder later
+comm_list = [3, 34, 72]
 start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
 regression_outfile = '../output/regression' +  comms
 readFrame_outfile = '../output/misinfo_reads' + comms

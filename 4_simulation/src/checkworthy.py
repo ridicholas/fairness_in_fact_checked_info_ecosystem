@@ -10,12 +10,13 @@ import pandas as pd
 class Checkworthy():
 
 
-    def __init__(self, agg_interval, agg_steps, depths, impactednesses):
+    def __init__(self, agg_interval, agg_steps, depths, impactednesses, beliefs):
         self.checkworthy_data = {}
         self.sampled_checkworthy_data = {}
         self.agg_interval = agg_interval
         self.agg_steps = agg_steps
         self.impactednesses = impactednesses
+        self.beliefs = beliefs
         self.depths = depths
         self.node = 'empty'
         self.data = 'empty'
@@ -178,10 +179,10 @@ class Checkworthy():
         import numpy as np
 
         G = self.G
-        impactedness = self.impactednesses
         communities = pd.DataFrame.from_dict(data = self.get_node_attributes(G, 'Community'), orient='index').rename(columns={0:'Community'})
         belief = self.get_node_attributes(G, 'sentiment')
         all_nodes = list(G.nodes())
+        beliefs = self.beliefs
 
         for claim_id in self.sampled_checkworthy_data:
 
@@ -193,7 +194,7 @@ class Checkworthy():
             elif sample_method == 'stratified':
                 nodes_to_survey = communities.groupby('Community', group_keys=False).apply(lambda x: x.sample(int(labels_per_claim/3))).index.to_list()
             elif sample_method == 'knowledgable_community':
-                max_keys = [key for key, value in impactedness[topic].items() if value == max(impactedness[topic].values())]
+                max_keys = [key for key, value in beliefs[topic].items() if value == min(beliefs[topic].values())]
                 nodes_to_survey = communities[communities['Community'].isin(max_keys)].apply(lambda x: x.sample(labels_per_claim, replace = True)).index.to_list()
 
             survey_results = []
