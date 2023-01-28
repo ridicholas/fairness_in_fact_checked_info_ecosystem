@@ -144,7 +144,8 @@ def main(argv):
                 agg_interval = config['agg_interval'],
                 agg_steps = config['agg_steps'],
                 depths = config['depths'],
-                impactednesses = impactednesses
+                impactednesses = impactednesses,
+                beliefs = beliefs
             )
 
 
