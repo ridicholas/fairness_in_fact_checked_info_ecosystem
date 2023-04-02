@@ -14,7 +14,7 @@ def main(argv):
     """
     specify run parameters. p is period (pre, post), m is mitigation method, l is label method, s is sample method
     """
-    opts, args = getopt.getopt(argv, "p:m:l:s:g:k")
+    opts, args = getopt.getopt(argv, "p:m:l:s:k:g")
 
     for opt, arg in opts:
         if opt == "-m":
@@ -155,6 +155,7 @@ def main(argv):
                 runtime = config['runtime'],
                 communities = communities,
                 num_claims = config['num_claims'],
+                moderators = moderator,
                 rep=rep
             )
 
@@ -169,9 +170,7 @@ def main(argv):
                 sim.create_simulation_network(
                     raw_network_path = config['raw_network_path'],
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
-                    perc_bots = config['perc_bots'],
-                    moderators = moderator
-                )
+                    perc_bots = config['perc_bots'])
 
             # Pass network to Checkworthy object
             check.set_network(G = sim.return_network(), communities=sim.return_communities())
