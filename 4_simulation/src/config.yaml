@@ -8,8 +8,7 @@ communities:
 - 3
 - 49
 - 72
-minority_community: 34
-knowledgeable_community: 72
+# machine learning feature parameter
 depths:
 - 2
 - 4

@@ -561,7 +561,7 @@ class TopicSim():
 
         return G2
 
-    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments, moderators, oversample_amt=0.01):
+    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments, moderators, oversample_amt=0.15):
 
         import numpy as np
         import networkx as nx

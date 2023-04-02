@@ -14,7 +14,7 @@ def main(argv):
     """
     specify run parameters. p is period (pre, post), m is mitigation method, l is label method, s is sample method
     """
-    opts, args = getopt.getopt(argv, "p:m:l:s:g")
+    opts, args = getopt.getopt(argv, "p:m:l:s:g:k")
 
     for opt, arg in opts:
         if opt == "-m":
@@ -25,6 +25,8 @@ def main(argv):
             sample_method = arg
         elif opt == "-p":
             period = arg
+        elif opt == '-k':
+            moderator = arg
 
 
 
@@ -93,15 +95,12 @@ def main(argv):
                     
     elif config['state_of_world'] == 2:
         
-        num_topics = len(communities) - 1
-        
-        
         '''
         This is a world where there exist N groups, and N - 1 topics. A majority and minority community are impacted differently
         by each topic. A minority knowledgeable community is impacted equally by both topics.
         '''
-        
-        
+
+        num_topics = len(communities) - 1
         impactednesses = [{comm: 0.5 for comm in communities} for i in range(num_topics)]
         for com in range(len(communities)):
             for i in range(num_topics):
@@ -170,7 +169,8 @@ def main(argv):
                 sim.create_simulation_network(
                     raw_network_path = config['raw_network_path'],
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
-                    perc_bots = config['perc_bots']
+                    perc_bots = config['perc_bots'],
+                    moderator = moderator
                 )
 
             # Pass network to Checkworthy object
