@@ -2,11 +2,14 @@ reps: 10
 agg_interval: 3
 agg_steps: 3
 claims_to_sample: 1000
-# if running state 2, put your intended knowledgeable community in last position
+# if running state 2, the ordering should be (1) majority (2) minority (3) knowledgeable community
+# if running state 1, the ordering should be (1) majority, then order doesn't matter for minority communities
 communities:
 - 3
-- 34
+- 49
 - 72
+minority_community: 34
+knowledgeable_community: 72
 depths:
 - 2
 - 4

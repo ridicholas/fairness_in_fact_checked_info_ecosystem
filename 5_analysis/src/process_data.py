@@ -456,7 +456,10 @@ start_network_path = '../../4_simulation/output/simulation_net_communities_' + c
 regression_outfile = '../output/regression' +  comms
 readFrame_outfile = '../output/misinfo_reads' + comms
 beliefFrame_outfile = '../output/belief_results' + comms
+communityFeatures_outfile = '../output/community_features' + comms
 reps = 10
+community_features = True
+
 
 paths = []
 
@@ -469,12 +472,24 @@ for mod in modules:
 
 
 
+if community_features:
+    reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results_community_level(infile=infile,
+                                                                                                    reps = reps,
+                                                                                                    paths = paths,
+                                                                                                    communities=comms,
+                                                                                                    comm_list=comm_list,
+                                                                                                    community_features=community_features)
+    regression.to_csv(communityFeatures_outfile + '.csv', index=False)
+    reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
+    beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
+    
+else:
+    reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks = make_results_community_level(infile=infile,
+                                                                                                    reps = reps,
+                                                                                                    paths = paths,
+                                                                                                    communities=comms,
+                                                                                                    comm_list=comm_list)
+    reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
+    beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
 
-reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks = make_results_community_level(infile=infile,
-                                                                                                reps = reps,
-                                                                                                paths = paths,
-                                                                                                communities=comms,
-                                                                                                comm_list=comm_list)
-
-reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
-beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
+    

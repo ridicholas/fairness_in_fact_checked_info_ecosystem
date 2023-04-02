@@ -35,7 +35,7 @@ interventions = ['TopPredictedByTopic_knowledgable_community_stratified_nodes_vi
                  'TopPredicted_stratified_stratified_nodes_visited']
 
 
-individual_regression_data = pd.read_csv('../output/individual_level_regression_data.csv')
+individual_regression_data = pd.read_csv('../output/world_state_2/individual_level_regression_data.csv')
 individual_regression_data = individual_regression_data.rename(columns={'Change in Belief':'Change'})
 
 no_intervention = individual_regression_data.loc[(individual_regression_data['Intervention']=='no_intervention_change_in_belief')]
@@ -75,6 +75,11 @@ for rep in range(reps):
             results.append([rep, community, intervention, ate_est, ate_var])
                 
             
-results_frame = pd.DataFrame(results, columns = ['Rep', 'Community', 'Intervention', 'ATE_est', 'ATE_var']).groupby(['Community', 'Intervention'])['ATE_est', 'ATE_var'].apply(lambda x: np.mean(x)).reset_index()
+results_frame = pd.DataFrame(results, columns = ['Rep', 'Community', 'Intervention', 'ATE_est', 'ATE_var'])\
+    .sort_values(by=['Community','Intervention', 'Rep'])
+    
+results_frame_grouped = results_frame\
+    .groupby(['Community', 'Intervention'])['ATE_est', 'ATE_var'].apply(lambda x: np.mean(x)).reset_index()
         
-results_frame.to_csv('../output/ATE_data.csv', index=False)
+results_frame.to_csv('../output/ATE_Data_raw.csv', index=False)
+results_frame_grouped.to_csv('../output/ATE_data.csv', index=False)

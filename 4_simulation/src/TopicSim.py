@@ -561,7 +561,7 @@ class TopicSim():
 
         return G2
 
-    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments):
+    def set_node_attributes(self, G, perc_nodes_to_use, numTopics, perc_bots, impactednesses, sentiments, moderators, oversample_amt=0.01):
 
         import numpy as np
         import networkx as nx
@@ -580,12 +580,67 @@ class TopicSim():
                                 (this value will be used as mean for drawing distribution)
         :return: returns new network where nodes have impactedness, sentiments, and are bots
         '''
+        
+        majority_community = self.communities[0]
+        minority_community = self.communities[1]
+        knowledgeable_community = self.communities[2]
 
-        to_remove = random.sample(list(G.nodes), int(len(G.nodes)*(1-perc_nodes_to_use)))
-        to_keep = list(set(list(G.nodes)) - set(to_remove))
-        G.remove_nodes_from(to_remove)
+        
+        if moderators == 'none':
+            to_remove = random.sample(list(G.nodes), int(len(G.nodes)*(1-perc_nodes_to_use)))
+            to_keep = list(set(list(G.nodes)) - set(to_remove))
+            G.remove_nodes_from(to_remove)
+            G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
+            G.remove_nodes_from(list(nx.isolates(G)))
+            
+            
+        elif moderators == 'reduce-density':
+            community = nx.get_node_attributes(G, 'Community')
+            to_remove = []
+            minority_community_size = 0
+                    
+            # oversample nodes for minority community
+            for node in community:
+                if community[node] == minority_community:
+                    minority_community_size += 1
+                    if np.random.uniform() > perc_nodes_to_use + oversample_amt:
+                        to_remove.append(node) 
+                else:
+                    if np.random.uniform() > perc_nodes_to_use:
+                        to_remove.append(node)
+                
+            amt_to_remove = int(minority_community_size*oversample_amt)
+            G.remove_nodes_from(to_remove)
+            G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
+            G.remove_nodes_from(list(nx.isolates(G)))
+            
+            cluster = nx.clustering(G)
+            community = nx.get_node_attributes(G, 'Community')
+            for node in community:
+                if community[node] != minority_community:
+                    cluster.pop(node)
+                        
+            cluster_df = pd.DataFrame.from_dict(cluster, orient='index', columns=['clustering'])
+            cluster_df['clustering'] = cluster_df['clustering'] + 0.001
+            cluster_df['pct'] = (cluster_df['clustering'])/sum(cluster_df['clustering'])
+            more_to_remove = np.random.choice(cluster_df.index.to_list(), 
+                                                  size=amt_to_remove, 
+                                                  p=cluster_df.pct.to_list(), 
+                                                  replace=False).tolist()
+                
+            to_remove = list(to_remove) + list(more_to_remove)
+            G.remove_nodes_from(more_to_remove)
+            G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
+            G.remove_nodes_from(list(nx.isolates(G)))
+            to_keep = list(G.nodes)               
+
+
+
 
         # Randomly select who will be a bot
+        
+        
+        
         num_bots = int(np.round(len(to_keep)*perc_bots))
         bot_names = random.sample(to_keep, num_bots) #might want to make it so we sample a certain number from each community instead
 

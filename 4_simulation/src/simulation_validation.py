@@ -76,44 +76,65 @@ def calculate_ccdf(results_frame):
                 sum_frame.loc[i,"CCDF (%)"] = np.sum(sum_frame.claim.values[i:len(sum_frame)])/np.sum(sum_frame.claim.values)*100
                 
             sum_frame['type'] = metric
-            sum_frame['info_type'] = info_type
+            sum_frame['Info Veracity'] = info_type
             
             ccdf_frame = ccdf_frame.append(sum_frame)
     
     
     return ccdf_frame
 
+#0, 5!, 6, 9
 
-infile = '../output/simulation_pre_period_run0_communities_3_34_72.pickle'
+infile = '../output/simulation_pre_period_run9_communities_3_34_72.pickle'
 with open(infile, 'rb') as file:
     sim = pickle.load(file)
 
 all_info = sim.all_info
 
-n_sample = 1500000
-random_keys = np.random.choice(list(sim.all_info), size = n_sample, replace = False)
-
-
-
 result = []
-for key in random_keys:
+for key in list(all_info.keys()):
     result.append(calc_cascade_stats(utterance=sim.all_info[key]))
     
 results_frame = pd.DataFrame(result, columns = ['topic', 'claim', 'value', 'Size of Cascade (Nodes)', 'Max Depth of Cascade', 'Max Breadth  of Cascade'])
 ccdf_frame = calculate_ccdf(results_frame = results_frame)
 
 
-g = (ggplot(ccdf_frame)
- + geom_line(aes(x='value', y = 'CCDF (%)', color = 'info_type'), size = 1.5)
- + facet_wrap('~ type',
-              scales = 'free_x')
- + theme(panel_grid_major = element_blank(), panel_grid_minor = element_blank())
- + scale_y_log10()
- + scale_x_log10())
+measures = ['Size of Cascade (Nodes)', 'Max Breadth  of Cascade', 'Max Depth of Cascade']
+for i in range(len(measures)):
+    
+    ccdf_measure = ccdf_frame.loc[ccdf_frame['type']==measures[i]]
+    
+    
+    if i == 0:
+        
+        g = (ggplot(ccdf_measure)
+         + geom_line(aes(x='value', y = 'CCDF (%)', color = 'Info Veracity'), size = 1.5)
+         + theme_light()
+         + theme(legend_position=(0.7, 0.75), text=element_text(size=16))
+         + scale_y_log10()
+         + scale_x_log10()
+         + xlab(measures[i]))
+        
+        g.save('../output/simulation_validation' + measures[i] + '.png', width=6, height =6, dpi=600)
+    
+    else:
+        
+        g = (ggplot(ccdf_measure)
+         + geom_line(aes(x='value', y = 'CCDF (%)', color = 'Info Veracity'), size = 1.5)
+         + theme_light()
+         + theme(legend_position='none', text=element_text(size=16))
+         + scale_y_log10()
+         + scale_x_log10()
+         + xlab(measures[i]))
+        
+        g.save('../output/simulation_validation' + measures[i] + '.png', width=6, height =6, dpi=600)
+
+        
+        
 
 
 
-g.save('../output/simulation_validation.png', width=14, height =6)
+
 
 type_ccdf = results_frame\
     .groupby(['value', 'claim']).size().reset_index(name='draws')\
@@ -130,14 +151,15 @@ for info in types:
         tmp.loc[tmp.index.values[i], 'CCDF (%)'] = np.sum(tmp['Number of Cascades'].values[i:len(tmp)])/np.sum(tmp['Number of Cascades'].values)*100
     final_ccdf = final_ccdf.append(tmp)
 
-final_ccdf['Info Type'] = np.where(final_ccdf['value']==-1, 'Truth', 'False')
+final_ccdf['Info Veracity'] = np.where(final_ccdf['value']==-1, 'Truth', 'False')
 
 g1 = (ggplot(final_ccdf)
- + geom_line(aes(x='draws', y = 'CCDF (%)', color = 'Info Type'), size = 1.5)
- + theme(panel_grid_major = element_blank(), panel_grid_minor = element_blank())
+ + geom_line(aes(x='draws', y = 'CCDF (%)', color = 'Info Veracity'), size = 1.5)
+ + theme_light()
+ + theme(legend_position='none', text=element_text(size=16))
  + scale_y_log10()
  + scale_x_log10()
- + xlab('Number of Cascades for Specific Rumor'))
+ + xlab('Number of Utterances (Cascades) per Claim'))
 
 
-g1.save('../output/simulation_validation_information_distribution.png', width=7, height =6)
+g1.save('../output/simulation_validation_information_distribution.png', width=6, height =6, dpi = 600)
