@@ -170,7 +170,7 @@ def main(argv):
                     raw_network_path = config['raw_network_path'],
                     perc_nodes_to_subset = config['perc_nodes_to_subset'],
                     perc_bots = config['perc_bots'],
-                    moderator = moderator
+                    moderators = moderator
                 )
 
             # Pass network to Checkworthy object

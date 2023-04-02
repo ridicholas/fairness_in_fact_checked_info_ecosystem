@@ -78,7 +78,7 @@ class TopicSim():
 
     # This assumes a "raw" networkx gpickle where each node has one attribtue: "Community".
     # We ran Louvain community detection algorithm to create this attribute
-    def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots, filetype='gexf'):
+    def create_simulation_network(self, raw_network_path, perc_nodes_to_subset, perc_bots, moderators, filetype='gexf'):
         if filetype == 'gexf':
             G = nx.read_gexf(raw_network_path)
         elif filetype == 'gpickle':
@@ -89,7 +89,8 @@ class TopicSim():
                                            numTopics = self.num_topics,
                                            perc_bots = perc_bots,
                                            impactednesses = self.impactedness,
-                                           sentiments = self.beliefs)
+                                           sentiments = self.beliefs,
+                                           moderators = moderators)
         self.G = sampleG
 
 

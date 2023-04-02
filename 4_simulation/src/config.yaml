@@ -33,7 +33,7 @@ min_degree: 1
 nodes_to_sample: 30
 num_claims: 10000
 perc_bots: 0.1
-perc_nodes_to_subset: 0.15
+perc_nodes_to_subset: 0.25
 post_duration: 3
 random_communities: False
 runtime: 150
