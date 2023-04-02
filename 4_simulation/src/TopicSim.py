@@ -593,7 +593,9 @@ class TopicSim():
             G.remove_nodes_from(to_remove)
             G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
             G.remove_nodes_from(list(nx.isolates(G)))
-            
+            num_bots = int(np.round(len(to_keep)*perc_bots))
+            bot_names = random.sample(to_keep, num_bots) #might want to make it so we sample a certain number from each community instead
+
             
         elif moderators == 'reduce-density':
             community = nx.get_node_attributes(G, 'Community')
@@ -633,7 +635,12 @@ class TopicSim():
             G.remove_nodes_from(more_to_remove)
             G.remove_edges_from(list(nx.selfloop_edges(G, data=True)))
             G.remove_nodes_from(list(nx.isolates(G)))
-            to_keep = list(G.nodes)               
+            to_keep = list(G.nodes)
+            num_bots = int(np.round(len(to_keep)*perc_bots))
+            bot_names = random.sample(to_keep, num_bots) #might want to make it so we sample a certain number from each community instead
+
+        
+            
 
 
 
@@ -642,8 +649,6 @@ class TopicSim():
         
         
         
-        num_bots = int(np.round(len(to_keep)*perc_bots))
-        bot_names = random.sample(to_keep, num_bots) #might want to make it so we sample a certain number from each community instead
 
         for node, data in G.nodes(data=True):
 
