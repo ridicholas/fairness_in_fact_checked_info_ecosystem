@@ -10,8 +10,15 @@ import progressbar
 import time
 import community as community_louvain
 import gc
+import yaml
 # making sure wd is file directory so hardcoded paths work
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+
+with open('../../4_simulation/src/config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+
 
 def make_comm_string(communities):
         comm_string = ''
@@ -411,8 +418,8 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
 modules = ['TopPredicted', 'TopPredictedByTopic']
 labels = ['random', 'knowledgable_community', 'stratified']
 sampling = ['nodes_visited', 'stratified_nodes_visited']
-reps = 10
-comms = [3, 34, 72]
+reps = config['reps']
+comms = config['communities']
 comm_string = make_comm_string(comms)
 
 
@@ -443,53 +450,53 @@ results.to_csv('../output/individual_level_regression_data.csv', index = False)
 
 
 
-print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
+# print('\n\n\n ------- Processing Community Sentiment over Time ------- \n\n\n')
 
 
-modules = ['TopPredicted', 'TopPredictedByTopic']
-label_methods = ['random', 'stratified', 'knowledgable_community']
-sample_methods = ['nodes_visited', 'stratified_nodes_visited']
-infile = '../../4_simulation/output/simulation_'
-comms = '_3_34_72' #manually input this for now, we can write an automated finder later
-comm_list = [3, 34, 72]
-start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
-regression_outfile = '../output/regression' +  comms
-readFrame_outfile = '../output/misinfo_reads' + comms
-beliefFrame_outfile = '../output/belief_results' + comms
-communityFeatures_outfile = '../output/community_features' + comms
-reps = 10
-community_features = True
+# modules = ['TopPredicted', 'TopPredictedByTopic']
+# label_methods = ['random', 'stratified', 'knowledgable_community']
+# sample_methods = ['nodes_visited', 'stratified_nodes_visited']
+# infile = '../../4_simulation/output/simulation_'
+# comms = '_3_34_72' #manually input this for now, we can write an automated finder later
+# comm_list = [3, 34, 72]
+# start_network_path = '../../4_simulation/output/simulation_net_communities_' + comms + '.gpickle'
+# regression_outfile = '../output/regression' +  comms
+# readFrame_outfile = '../output/misinfo_reads' + comms
+# beliefFrame_outfile = '../output/belief_results' + comms
+# communityFeatures_outfile = '../output/community_features' + comms
+# reps = 10
+# community_features = True
 
 
-paths = []
+# paths = []
 
-paths.append('../../4_simulation/output/simulation_final_no_intervention_')
-for mod in modules:
-    for l in label_methods:
-        for s in sample_methods:
-            p = '../../4_simulation/output/simulation_' + mod + '_' + l + '_' + s + '_'
-            paths.append(p)
+# paths.append('../../4_simulation/output/simulation_final_no_intervention_')
+# for mod in modules:
+#     for l in label_methods:
+#         for s in sample_methods:
+#             p = '../../4_simulation/output/simulation_' + mod + '_' + l + '_' + s + '_'
+#             paths.append(p)
 
 
 
-if community_features:
-    reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results_community_level(infile=infile,
-                                                                                                    reps = reps,
-                                                                                                    paths = paths,
-                                                                                                    communities=comms,
-                                                                                                    comm_list=comm_list,
-                                                                                                    community_features=community_features)
-    regression.to_csv(communityFeatures_outfile + '.csv', index=False)
-    reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
-    beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
+# if community_features:
+#     reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks, regression = make_results_community_level(infile=infile,
+#                                                                                                     reps = reps,
+#                                                                                                     paths = paths,
+#                                                                                                     communities=comms,
+#                                                                                                     comm_list=comm_list,
+#                                                                                                     community_features=community_features)
+#     regression.to_csv(communityFeatures_outfile + '.csv', index=False)
+#     reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
+#     beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
     
-else:
-    reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks = make_results_community_level(infile=infile,
-                                                                                                    reps = reps,
-                                                                                                    paths = paths,
-                                                                                                    communities=comms,
-                                                                                                    comm_list=comm_list)
-    reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
-    beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
+# else:
+#     reads_frame, beliefs_frame, checks_frame, reads, beliefs, checks = make_results_community_level(infile=infile,
+#                                                                                                     reps = reps,
+#                                                                                                     paths = paths,
+#                                                                                                     communities=comms,
+#                                                                                                     comm_list=comm_list)
+#     reads_frame.to_csv(readFrame_outfile + '.csv', index=False)
+#     beliefs_frame.to_csv(beliefFrame_outfile + '.csv', index=False)
 
     
