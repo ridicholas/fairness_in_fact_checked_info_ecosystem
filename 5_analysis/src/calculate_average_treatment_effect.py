@@ -17,25 +17,23 @@ import time
 import gc
 from plotnine import *
 
-os.chdir('/Users/tdn897/Desktop/NetworkFairness/fairness_in_fact_checked_info_ecosystem/5_analysis/src')
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-communities = [3, 34, 72]
-reps = 10
+
+with open('../../4_simulation/src/config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+
+
+
+communities = config['communities']
+reps = config['reps']
 interventions = ['TopPredictedByTopic_knowledgable_community_stratified_nodes_visited',
-                 'TopPredictedByTopic_knowledgable_community_nodes_visited',
-                 'TopPredictedByTopic_random_nodes_visited',
-                 'TopPredictedByTopic_random_stratified_nodes_visited',
-                 'TopPredictedByTopic_stratified_nodes_visited',
-                 'TopPredictedByTopic_stratified_stratified_nodes_visited',
-                 'TopPredicted_knowledgable_community_nodes_visited',
                  'TopPredicted_knowledgable_community_stratified_nodes_visited',
-                 'TopPredicted_random_nodes_visited',
-                 'TopPredicted_random_stratified_nodes_visited',
-                 'TopPredicted_stratified_nodes_visited',
-                 'TopPredicted_stratified_stratified_nodes_visited']
+                 'TopPredicted_random_nodes_visited']
 
 
-individual_regression_data = pd.read_csv('../output/world_state_2/individual_level_regression_data.csv')
+individual_regression_data = pd.read_csv('../output/moderators_experiment_none/individual_level_regression_data.csv')
 individual_regression_data = individual_regression_data.rename(columns={'Change in Belief':'Change'})
 
 no_intervention = individual_regression_data.loc[(individual_regression_data['Intervention']=='no_intervention_change_in_belief')]
@@ -81,5 +79,5 @@ results_frame = pd.DataFrame(results, columns = ['Rep', 'Community', 'Interventi
 results_frame_grouped = results_frame\
     .groupby(['Community', 'Intervention'])['ATE_est', 'ATE_var'].apply(lambda x: np.mean(x)).reset_index()
         
-results_frame.to_csv('../output/ATE_Data_raw.csv', index=False)
-results_frame_grouped.to_csv('../output/ATE_data.csv', index=False)
+results_frame.to_csv('../output/moderators_experiment_none/ATE_Data_raw.csv', index=False)
+results_frame_grouped.to_csv('../output/moderators_experiment_none/ATE_data.csv', index=False)
