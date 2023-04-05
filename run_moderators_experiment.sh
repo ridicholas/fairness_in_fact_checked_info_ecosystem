@@ -1,8 +1,8 @@
 cd 4_simulation/src
 
-nohup python3 -u main.py -p 'pre' -k 'reduce-density' > pre.out &
+#nohup python3 -u main.py -p 'pre' -k 'reduce-density' > pre.out &
 
-wait
+#wait
 
 nohup python3 -u main.py -p 'post' -m 'None' > post_none.out &
 
