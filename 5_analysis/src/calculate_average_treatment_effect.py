@@ -34,7 +34,7 @@ interventions = ['TopPredictedByTopic_knowledgable_community_stratified_nodes_vi
                  'TopPredicted_random_nodes_visited']
 
 
-individual_regression_data = pd.read_csv('../output/moderators_experiment_none/individual_level_regression_data.csv')
+individual_regression_data = pd.read_csv('../output/moderators_experiment_density/individual_level_regression_data.csv')
 individual_regression_data = individual_regression_data.rename(columns={'Change in Belief':'Change'})
 
 no_intervention = individual_regression_data.loc[(individual_regression_data['Intervention']=='no_intervention_change_in_belief')]
@@ -80,5 +80,5 @@ results_frame = pd.DataFrame(results, columns = ['Rep', 'Community', 'Interventi
 results_frame_grouped = results_frame\
     .groupby(['Community', 'Intervention'])['ATE_est', 'ATE_var'].apply(lambda x: np.mean(x)).reset_index()
         
-results_frame.to_csv('../output/moderators_experiment_none/ATE_Data_raw.csv', index=False)
-results_frame_grouped.to_csv('../output/moderators_experiment_none/ATE_data.csv', index=False)
+results_frame.to_csv('../output/moderators_experiment_density/ATE_Data_raw.csv', index=False)
+results_frame_grouped.to_csv('../output/moderators_experiment_density/ATE_data.csv', index=False)
