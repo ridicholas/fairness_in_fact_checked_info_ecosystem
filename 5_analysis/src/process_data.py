@@ -302,6 +302,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                     'rep':rep,
                                     'kind':data['kind'],
                                     'out_degree':G.out_degree[node],
+                                    'in_degree':G.in_degree[node],
                                     'clustering':cluster[node]})
 
             # -- 1. collect average per topic belief of nodes followed
@@ -378,6 +379,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                                 node_dict[node]['community'],
                                                 node_dict[node]['kind'],
                                                 node_dict[node]['out_degree'],
+                                                node_dict[node]['in_degree'],
                                                 node_dict[node]['number_bots_followed'],
                                                 node_dict[node]['betweenness_centrality'],
                                                 node_dict[node]['clustering'],
@@ -397,6 +399,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                         'Community',
                                         'Kind',
                                         'Out Degree',
+                                        'In Degree',
                                         'Number of Bots Followed',
                                         'Betweenness Centrality',
                                         'Clustering',
@@ -407,7 +410,7 @@ def process_individual_level_data(reps, modules, labels, sampling, comm_string):
                                         'Change in Belief'])
 
     results = results.loc[(results['Kind'] != 'bot')&(results['Out Degree'] > 0)]
-    results.drop(columns = ['Kind', 'Out Degree'], inplace=True)
+    results.drop(columns = ['Kind'], inplace=True)
     return results
 
 
